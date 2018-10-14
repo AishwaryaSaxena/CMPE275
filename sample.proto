@@ -1,0 +1,55 @@
+// syntax = "proto3";
+
+// message TestName
+// {
+//     string name = 1;
+// }
+
+// message TestMess
+// {
+//     string mess = 1;
+//     // Id id = 2;
+//     string 
+// }
+
+// message Empty 
+// {}
+
+// message Id
+// {
+//     string id = 1;
+// }
+
+// service Tester
+// {
+//     rpc registerNode (TestName) returns (Id);
+//     rpc sendMessage (TestMess) returns (Empty);
+//     rpc recvMessage (Empty) returns (TestMess);
+//     // rpc getMyFriends (Id) returns (Id);
+//     // rpc send(TestMess) returns (Id);
+// }
+
+syntax = "proto3";
+
+message InputMessage {
+    string msg = 1;
+    string dest = 2;
+    string origin = 3;
+}
+
+message ReponseMessage{
+    string action = 1;
+    InputMessage msg = 2;
+}
+
+message Empty{
+
+}
+
+service DataTransfer {
+    rpc sendMessage(InputMessage) returns (Empty);
+    rpc recvMessage(Empty) returns (ReponseMessage);
+}
+
+//python -m grpc.tools.protoc -I. --python_out=. --grpc_python_out=. chat.proto
+
