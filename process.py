@@ -4,10 +4,9 @@ import grpc
 from concurrent import futures
 import time
 import threading
+import collections
 
-ids = []
-pair = {}
-pairs = {}
+mq = collections.deque([])
 
 
 class DataTransfer(sample_pb2_grpc.DataTransferServicer):
@@ -25,7 +24,7 @@ def serve():
     chat = DataTransfer()
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
     sample_pb2_grpc.add_DataTransferServicer_to_server(chat, server)
-    server.add_insecure_port("localhost:3001")
+    server.add_insecure_port("localhost:3000")
     server.start()
     try:
         time.sleep(86400)
@@ -34,8 +33,8 @@ def serve():
 
 
 def run():
-    stub = sample_pb2_grpc.DataTransferStub(grpc.insecure_channel(
-        "localhost:3002"))  # server on another client
+    stub = sample_pb2_grpc.DataTransferStub(
+        grpc.insecure_channel("localhost:3001"))  # server on another client
     prev_mess = stub.recvMessage(sample_pb2.Empty()).mess
     try:
         while True:
