@@ -17,7 +17,7 @@ class DataTransfer(sample_pb2_grpc.DataTransferServicer):
 
     def sendMessage(self, request, context):
         if(request.dest == my_ip):
-            print("%s : %s" %(request.origin, request.msg))
+            print("%s : %s" % (request.origin, request.msg))
         else:
             mq.append(request)
         return sample_pb2.Empty()
@@ -32,7 +32,7 @@ def serve():
     sample_pb2_grpc.add_DataTransferServicer_to_server(chat, server)
     server.add_insecure_port(my_ip)
     server.start()
-    inmsg = sample_pb2.InputMessage(origin = my_ip)
+    inmsg = sample_pb2.InputMessage(origin=my_ip)
     try:
         while True:
             msg_dest = input("Enter message and destination:").split(";")
@@ -50,7 +50,7 @@ def run():
             if len(mq) == 0:
                 continue
             else:
-                stub.sendMessage(mq.popleft)
+                stub.sendMessage(mq.popleft())
     except KeyboardInterrupt:
         pass
 
