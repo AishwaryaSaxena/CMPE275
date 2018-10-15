@@ -2,13 +2,18 @@ import sample_pb2
 import sample_pb2_grpc
 import grpc
 from concurrent import futures
-import time
 import threading
 import collections
+import sys
 
 mq = collections.deque([])
 my_ip = "localhost:4000"
 next_ip = "localhost:4001"
+
+friends = {"n1": "localhost:4000",
+           "n2": "localhost:4001",
+           "n3": "localhost:4002",
+           "n4": "localhost:4003"}
 
 
 class DataTransfer(sample_pb2_grpc.DataTransferServicer):
@@ -17,7 +22,7 @@ class DataTransfer(sample_pb2_grpc.DataTransferServicer):
 
     def sendMessage(self, request, context):
         if(request.dest == my_ip):
-            print("%s : %s" % (request.origin, request.msg))
+            print("\n[%s] : %s" % (request.origin, request.msg))
         else:
             mq.append(request)
         return sample_pb2.Empty()
@@ -33,13 +38,15 @@ def serve():
     server.add_insecure_port(my_ip)
     server.start()
     inmsg = sample_pb2.InputMessage(origin=my_ip)
-    try:
-        while True:
-            msg_dest = input("Enter message and destination:").split(";")
-            inmsg.msg, inmsg.dest = msg_dest[0], msg_dest[1]
+    while True:
+        try:
+            msg_dest = input("%s : " % (my_ip)).split("->")
+            inmsg.msg, inmsg.dest = msg_dest[0], friends[msg_dest[1].strip()]
             mq.append(inmsg)
-    except KeyboardInterrupt:
-        pass
+        except KeyboardInterrupt:
+            sys.exit(0)
+        except IndexError:
+            print("Enter in correct format")
 
 
 def run():
@@ -62,5 +69,5 @@ if __name__ == '__main__':
     t1.start()
     t2.start()
 
-    t1.join()
-    t2.join()
+    # t1.join()
+    # t2.join()
