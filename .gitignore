@@ -1,2 +1,7 @@
+.gitignore
 sample_pb2_grpc.py
 sample_pb2.py
+__pycache__/
+raft_implementation_grpc/raft_pb2_grpc.py
+raft_implementation_grpc/raft_pb2.py
+raft_implementation_grpc/__pycache__/

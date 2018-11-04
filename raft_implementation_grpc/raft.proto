@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+service raftImplemetation
+{
+    rpc RequestVote (VoteReq) returns (Vote);
+    rpc AppendEntries (Empty) returns (Empty);
+    rpc SendHeartBeat (Heartbeat) returns (AckHB);
+}
+
+message Heartbeat
+{
+    string id = 1;
+    int64 currentTerm = 2;
+}
+
+message VoteReq
+{
+    string id = 1;
+    int64 currentTerm = 2;
+}
+
+
+message Vote
+{
+    bool voted = 1;
+    int64 currentTerm = 2;
+}
+
+message AckHB
+{
+    string ack = 1;
+}
+
+message Empty
+{
+
+}
+
+//python -m grpc.tools.protoc -I. --python_out=. --grpc_python_out=. raft.proto
+//python3 -m grpc.tools.protoc -I. --python_out=. --grpc_python_out=. raft.proto
