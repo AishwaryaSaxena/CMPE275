@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+message Empty
+{
+
+}
+
+message FileInfo
+{
+    string fileName = 1;
+}
+
+message FileMetadata
+{
+    string fileName = 1;
+    int64 chunkId = 2;
+    bytes data = 3;
+    int64 seqNum = 4;
+    int64 seqMax = 5;
+}
+
+service DataTransferService
+{
+    rpc DownloadFile (FileInfo) returns (stream FileMetadata);
+    rpc UploadFile (stream FileMetadata) returns (Empty);
+    rpc UploadFile1 (FileMetadata) returns (Empty);
+}
+
+
+// python -m grpc.tools.protoc -I. --python_out=. --grpc_python_out=. file_transfer.proto
