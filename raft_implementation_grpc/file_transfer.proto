@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package grpc;
+
+message RequestFileList {
+ 	bool isClient=1;		// true then client else other team
+}
+
+message FileInfo {
+	string fileName = 1;		// teamname_fileid (unique)
+}
+
+message ChunkInfo {
+	string fileName = 1;
+	int64 chunkId = 2;			// Starts from 0 - N
+	int64 startSeqNum = 3;
+}
+
+message FileMetaData {
+	string fileName = 1;
+	int64 chunkId = 2;
+	bytes data = 3;
+	int64 seqNum = 4;
+	int64 seqMax = 5;
+}
+
+message FileUploadData {
+	string fileName = 1;
+	bytes data = 2;
+	int64 seqNum = 3;
+	int64 seqMax = 4;
+}
+
+message  ProxyInfo {
+	string ip = 1;
+	string port = 2;
+}
+
+message FileLocationInfo {
+	string fileName = 1;
+	int64 maxChunks = 2;
+	repeated ProxyInfo lstProxy = 3;
+	bool isFileFound = 4;
+}
+
+message FileList {
+	repeated string lstFileNames = 1;
+}
+
+service DataTransferService {
+
+	// From team's client to team's own cluster
+	rpc RequestFileInfo (FileInfo) returns (FileLocationInfo);
+
+	// From team-1 cluster to rest of the nodes of other teams
+	rpc GetFileLocation (FileInfo) returns (FileLocationInfo);
+
+	// From team's client to the actual data-center node (can be any team's node)
+	rpc DownloadChunk (ChunkInfo) returns (stream FileMetaData);
+
+	rpc UploadFile (stream FileUploadData) returns (FileInfo);
+
+	// Interteam request
+	rpc ListFiles (RequestFileList) returns (FileList);
+}
+
+
+
+// 1. Upload file
+// 2. List files

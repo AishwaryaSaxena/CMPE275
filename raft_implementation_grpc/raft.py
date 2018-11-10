@@ -7,6 +7,8 @@ from concurrent import futures
 from threading import Thread, Event
 import sys
 from enum import Enum
+import file_transfer_pb2
+import file_transfer_pb2_grpc
 
 class States(Enum):
     Follower = 1
@@ -24,7 +26,7 @@ hb_recv = False
 vr_recv = False
 friends = ["localhost:4001", "localhost:4002", "localhost:4003", "localhost:4004"]
 
-class RaftImpl(raft_pb2_grpc.raftImplemetationServicer):
+class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.DataTransferServiceServicer):
     def RequestVote(self, voteReq, context):
         global vr_recv, my_state, my_term
         vr_recv = True
@@ -47,11 +49,27 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer):
         my_state = States.Follower
         my_term = hearBeat.currentTerm
         return AckHB(ack="StillAlive")
+    
+    def RequestFileInfo(self, FileInfo, context):
+        pass
+    
+    def GetFileLocation(self, Fileinfo, context):
+        pass
+    
+    def DownloadChunk(self, ChunkInfo, context):
+        pass
 
+    def UploadFile(self, FileUploadData_stream, context):
+        pass
+
+    def ListFiles(self, RequestFileList, context):
+        pass
+    
 def serve():
     raft = RaftImpl()
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     raft_pb2_grpc.add_raftImplemetationServicer_to_server(raft, server)
+    file_transfer_pb2_grpc.add_DataTransferServiceServicer_to_server(raft, server)
     server.add_insecure_port(my_id)
     server.start()
     try: 
