@@ -60,11 +60,16 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
         pass
 
     def UploadFile(self, FileUploadData_stream, context):
-        pass
+        dc = findDataCenter()
+        dc_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(dc))
+        return dc_stub.UploadFile(FileUploadData_stream)
 
     def ListFiles(self, RequestFileList, context):
         pass
-    
+
+def findDataCenter():
+    return "localhost:5000"
+
 def serve():
     raft = RaftImpl()
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))

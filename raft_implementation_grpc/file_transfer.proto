@@ -29,6 +29,8 @@ message FileUploadData {
 	bytes data = 2;
 	int64 seqNum = 3;
 	int64 seqMax = 4;
+	int64 chunkId = 5;
+	int64 maxChunks = 6;
 }
 
 message  ProxyInfo {
