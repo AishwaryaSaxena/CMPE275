@@ -67,8 +67,11 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
     def RequestFileInfo(self, FileInfo, context):
         fileName = FileInfo.fileName
         if my_state != States.Leader:
-            leader_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(leader_id))
-            return leader_stub.RequestFileInfo(FileInfo)
+            try:
+                leader_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(leader_id))
+                return leader_stub.RequestFileInfo(FileInfo)
+            except:
+                return FileLocationInfo(fileName = fileName, maxChunks = 0, lstProxy = [], isFileFound = False)
         else:
             fileFound = False
             for f_c in file_log.keys():
@@ -126,8 +129,11 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
         isClient = requestFileList.isClient
         if my_state != States.Leader:
             if isClient:
-                leader_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(leader_id))
-                return leader_stub.ListFiles(requestFileList)
+                try:
+                    leader_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(leader_id))
+                    return leader_stub.ListFiles(requestFileList)
+                except:
+                    return FileList(lstFileNames = [])
             else:
                 return FileList(lstFileNames = [])
         else:
