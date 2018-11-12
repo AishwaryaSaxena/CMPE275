@@ -7,7 +7,7 @@ from concurrent import futures
 from threading import Thread, Event
 import sys
 from enum import Enum
-import file_transfer_pb2
+from file_transfer_pb2 import FileLocationInfo, ProxyInfo
 import file_transfer_pb2_grpc
 from google.protobuf.json_format import MessageToDict
 
@@ -17,12 +17,14 @@ class States(Enum):
     Leader = 3
 
 my_id = "localhost:4000"
+leader_id = ""
 my_vote = False
 my_term = 1
 my_state = States.Follower
 delay = uniform(1.0, 1.5)
 stubs = []
 friends = ["localhost:4001", "localhost:4002"]
+external_nodes = ["localhost:4003"]
 hb_recv = False
 vr_recv = False
 # friends = ["localhost:4001", "localhost:4002", "localhost:4003", "localhost:4004"]
@@ -65,10 +67,51 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
         return AckHB(ack="StillAlive")
     
     def RequestFileInfo(self, FileInfo, context):
-        pass
+        fileName = FileInfo.fileName
+        leader_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(leader_id))
+        if my_state != States.Leader:
+            return leader_stub.RequestFileInfo(FileInfo)
+        else:
+            fileFound = False
+            for f_c in file_log.keys():
+                if fileName in f_c:
+                    fileFound = True
+                    break
+            if fileFound:
+                proxies = findProxies()
+                proxies_ser = []
+                for p in proxies:
+                    ip_port = p.split(':')
+                    proxies_ser.append(ProxyInfo(ip = ip_port[0], port = ip_port[1]))
+                return FileLocationInfo(fileName = fileName, maxChunks = file_max_chunks[fileName], lstProxy = proxies_ser, isFileFound = True)
+            else:
+                external_stub = ""
+                for n in external_nodes:
+                    external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
+                    file_loc_info = external_stub.GetFileLocation(FileInfo)
+                    if file_loc_info.isFileFound:
+                        return file_loc_info
+                return FileLocationInfo(fileName = fileName, maxChunks = 0, lstProxy = [], isFileFound = False)
     
-    def GetFileLocation(self, Fileinfo, context):
-        pass
+    def GetFileLocation(self, FileInfo, context):
+        fileName = FileInfo.fileName
+        if my_state != States.Leader:
+            return FileLocationInfo(fileName = fileName, maxChunks = 0, lstProxy = [], isFileFound = False)
+        else:
+            fileFound = False
+            for f_c in file_log.keys():
+                if fileName in f_c:
+                    fileFound = True
+                    break
+            if fileFound:
+                proxies = findProxies()
+                proxies_ser = []
+                for p in proxies:
+                    ip_port = p.split(':')
+                    proxies_ser.append(ProxyInfo(ip = ip_port[0], port = ip_port[1]))
+                return FileLocationInfo(fileName = fileName, maxChunks = file_max_chunks[fileName], lstProxy = proxies_ser, isFileFound = True)
+            else:
+                return FileLocationInfo(fileName = fileName, maxChunks = 0, lstProxy = [], isFileFound = False)
     
     def DownloadChunk(self, ChunkInfo, context):
         pass
@@ -84,6 +127,9 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
 def findDataCenter():
     return "localhost:5000"
     #######TODO######## find datacenter by available space and upload to multiple data centers
+
+def findProxies():
+    return friends
 
 def serve():
     raft = RaftImpl()
