@@ -1,5 +1,5 @@
 import raft_pb2_grpc
-from raft_pb2 import Heartbeat, VoteReq, Vote, AckHB, Empty
+from raft_pb2 import Heartbeat, VoteReq, Vote, AckHB, Empty, Log
 from random import uniform 
 from time import sleep
 import grpc
@@ -9,6 +9,7 @@ import sys
 from enum import Enum
 import file_transfer_pb2
 import file_transfer_pb2_grpc
+from google.protobuf.json_format import MessageToDict
 
 class States(Enum):
     Follower = 1
@@ -18,7 +19,7 @@ class States(Enum):
 my_id = "localhost:4000"
 my_vote = False
 my_term = 1
-my_state = States.Leader
+my_state = States.Follower
 delay = uniform(1.0, 1.5)
 stubs = []
 # friends = ["localhost:4001", "localhost:4002"]
@@ -47,11 +48,13 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
         pass
     
     def SendHeartBeat(self, hearBeat, context):
-        global hb_recv, my_state, my_term, vr_recv
+        global hb_recv, my_state, my_term, vr_recv, file_log, file_max_chunks
         hb_recv = True
         vr_recv = False
         my_state = States.Follower
         my_term = hearBeat.currentTerm
+        file_log = dict(hearBeat.log.fileLog)
+        file_max_chunks = dict(hearBeat.log.maxChunks)
         return AckHB(ack="StillAlive")
     
     def RequestFileInfo(self, FileInfo, context):
@@ -115,6 +118,7 @@ def timer():
     else:
         while True:
             print("Waiting for heartbeat", my_state.name, my_term)
+            print(file_log, file_max_chunks)
             if hb_recv:
                 hb_recv = False
                 sleep(delay)
@@ -154,11 +158,12 @@ def leaderActions():
     hb_ack = ""
     while my_state == States.Leader:
         print("Sending Heartbeats", my_state.name, my_term)
+        print(file_log, file_max_chunks)
         stub = ""
         for friend in friends:
             stub = raft_pb2_grpc.raftImplemetationStub(grpc.insecure_channel(friend))
             try:
-                hb_ack = stub.SendHeartBeat(Heartbeat(id=my_id, currentTerm=my_term), timeout=0.1)
+                hb_ack = stub.SendHeartBeat(Heartbeat(id=my_id, currentTerm=my_term, log = Log(fileLog = file_log, maxChunks = file_max_chunks)), timeout=0.1)
             except:
                 #print("node dead")
                 pass
