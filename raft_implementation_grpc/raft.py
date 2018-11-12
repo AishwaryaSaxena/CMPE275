@@ -7,7 +7,7 @@ from concurrent import futures
 from threading import Thread, Event
 import sys
 from enum import Enum
-from file_transfer_pb2 import FileLocationInfo, ProxyInfo
+from file_transfer_pb2 import FileLocationInfo, ProxyInfo, FileList, RequestFileList
 import file_transfer_pb2_grpc
 from google.protobuf.json_format import MessageToDict
 
@@ -52,11 +52,12 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
         pass
     
     def SendHeartBeat(self, hearBeat, context):
-        global hb_recv, my_state, my_term, vr_recv, file_log, file_max_chunks
+        global hb_recv, my_state, my_term, vr_recv, file_log, file_max_chunks, leader_id
         hb_recv = True
         vr_recv = False
         my_state = States.Follower
         my_term = hearBeat.currentTerm
+        leader_id = hearBeat.id
         file_log = dict(hearBeat.log.fileLog)
         for file_key in file_log.keys(): 
             file_log[file_key] = list(file_log[file_key].dcs)
@@ -65,13 +66,13 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
     
     def RequestFileInfo(self, FileInfo, context):
         fileName = FileInfo.fileName
-        leader_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(leader_id))
         if my_state != States.Leader:
+            leader_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(leader_id))
             return leader_stub.RequestFileInfo(FileInfo)
         else:
             fileFound = False
             for f_c in file_log.keys():
-                if fileName in f_c:
+                if fileName in f_c and len(file_log[f_c]) != 0:
                     fileFound = True
                     break
             if fileFound:
@@ -84,10 +85,13 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
             else:
                 external_stub = ""
                 for n in external_nodes:
-                    external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
-                    file_loc_info = external_stub.GetFileLocation(FileInfo)
-                    if file_loc_info.isFileFound:
-                        return file_loc_info
+                    try:
+                        external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
+                        file_loc_info = external_stub.GetFileLocation(FileInfo)
+                        if file_loc_info.isFileFound:
+                            return file_loc_info
+                    except:
+                        pass
                 return FileLocationInfo(fileName = fileName, maxChunks = 0, lstProxy = [], isFileFound = False)
     
     def GetFileLocation(self, FileInfo, context):
@@ -97,7 +101,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
         else:
             fileFound = False
             for f_c in file_log.keys():
-                if fileName in f_c:
+                if fileName in f_c and len(file_log[f_c]) != 0:
                     fileFound = True
                     break
             if fileFound:
@@ -118,8 +122,33 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
         dc_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(dc))
         return dc_stub.UploadFile(FileUploadData_stream)
 
-    def ListFiles(self, RequestFileList, context):
-        pass
+    def ListFiles(self, requestFileList, context):
+        isClient = requestFileList.isClient
+        if my_state != States.Leader:
+            if isClient:
+                leader_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(leader_id))
+                return leader_stub.ListFiles(requestFileList)
+            else:
+                return FileList(lstFileNames = [])
+        else:
+            file_list = set()
+            for f_c in file_log.keys():
+                if len(file_log[f_c]) != 0:
+                    file_list.add(f_c.rsplit('_', 1)[0])
+            if isClient:
+                external_stub = ""
+                for n in external_nodes:
+                    try:
+                        external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
+                        ext_file_list = external_stub.ListFiles(RequestFileList(isClient = False))
+                        print(ext_file_list.lstFileNames)
+                        file_list.update(ext_file_list.lstFileNames)
+                    except:
+                        pass
+                return FileList(lstFileNames = list(file_list))
+            else:
+                return FileList(lstFileNames = list(file_list))
+
 
 def findDataCenter():
     return "localhost:5000"
@@ -242,6 +271,7 @@ def leaderActions():
         sleep(0.5)
 
 def checkDcHealth():
+    ######TODO remove key also from file log if file removed
     global my_state, dcs, my_id, dc_files, file_max_chunks, file_log
     while True:
         if my_state == States.Leader:

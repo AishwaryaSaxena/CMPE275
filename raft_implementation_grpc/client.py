@@ -3,7 +3,7 @@ from concurrent import futures
 from time import sleep
 
 def run():
-    stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel("localhost:4000"))
+    stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel("localhost:4003"))
     seq_list = []
     with open("files/sample.txt", "rb") as f:
         for seq in iter(lambda: f.read(1024*10), b""):
@@ -39,12 +39,18 @@ def run():
 
     # for job in jobs:
     #     job.join() 
-    sleep(1)
-    file_loc_info = stub.RequestFileInfo(file_transfer_pb2.FileInfo(fileName = "sample.txt"))
-    proxies = []
-    for p in file_loc_info.lstProxy:
-        proxies.append(p.ip + ":" + p.port)
-    print(file_loc_info.fileName, file_loc_info.maxChunks, proxies, file_loc_info.isFileFound)
+
+    ###Request File Info
+    # sleep(1)
+    # file_loc_info = stub.RequestFileInfo(file_transfer_pb2.FileInfo(fileName = "antergos.iso"))
+    # proxies = []
+    # for p in file_loc_info.lstProxy:
+    #     proxies.append(p.ip + ":" + p.port)
+    # print(file_loc_info.fileName, file_loc_info.maxChunks, proxies, file_loc_info.isFileFound)
+
+    ###Get File List
+    file_list = stub.ListFiles(file_transfer_pb2.RequestFileList(isClient = True))
+    print(file_list.lstFileNames)
 
 
 
