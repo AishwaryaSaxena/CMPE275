@@ -6,7 +6,7 @@ def run():
     stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel("localhost:4000"))
     seq_list = []
     with open("files/antergos.iso", "rb") as f:
-        for seq in iter(lambda: f.read(1024*1024), b""):
+        for seq in iter(lambda: f.read(1024*10), b""):
             seq_list.append(file_transfer_pb2.FileUploadData(fileName="antergos.iso", data=seq))
 
     list_1, list_2, list_3 = seq_list[:len(seq_list)//3], seq_list[len(seq_list)//3:(len(seq_list)//3)*2], seq_list[(len(seq_list)//3)*2:]

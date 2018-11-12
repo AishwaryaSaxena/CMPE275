@@ -18,13 +18,17 @@ class States(Enum):
 my_id = "localhost:4000"
 my_vote = False
 my_term = 1
-my_state = States.Follower
+my_state = States.Leader
 delay = uniform(1.0, 1.5)
 stubs = []
 # friends = ["localhost:4001", "localhost:4002"]
 hb_recv = False
 vr_recv = False
 friends = ["localhost:4001", "localhost:4002", "localhost:4003", "localhost:4004"]
+dcs = ["localhost:5000", "localhost:5001"]
+dc_files = {}
+file_max_chunks = {}
+file_log = {}
 
 class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.DataTransferServiceServicer):
     def RequestVote(self, voteReq, context):
@@ -69,6 +73,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
 
 def findDataCenter():
     return "localhost:5000"
+    #######TODO######## find datacenter by available space and upload to multiple data centers
 
 def serve():
     raft = RaftImpl()
@@ -145,23 +150,56 @@ def startElection():
     
 
 def leaderActions():
-    global my_state, stubs, my_id, my_term, stubs
+    global my_state, stubs, my_id, my_term
     hb_ack = ""
     while my_state == States.Leader:
         print("Sending Heartbeats", my_state.name, my_term)
-        stubs = []
+        stub = ""
         for friend in friends:
-            stubs.append(raft_pb2_grpc.raftImplemetationStub(grpc.insecure_channel(friend)))
-        for stub in stubs:
+            stub = raft_pb2_grpc.raftImplemetationStub(grpc.insecure_channel(friend))
             try:
                 hb_ack = stub.SendHeartBeat(Heartbeat(id=my_id, currentTerm=my_term), timeout=0.1)
             except:
-                print("node dead")
+                #print("node dead")
+                pass
         sleep(0.5)
+
+def checkDcHealth():
+    global my_state, dcs, my_id, dc_files, file_max_chunks, file_log
+    while True:
+        if my_state == States.Leader:
+            stub = ""
+            for dc in dcs:
+                stub = raft_pb2_grpc.raftImplemetationStub(grpc.insecure_channel(dc))
+                try:
+                    hb_ack = stub.SendHeartBeat(Heartbeat(id=my_id))
+                    dc_ack = hb_ack.dcAck
+                    max_chunks = hb_ack.maxChunks
+                    for f in max_chunks.keys():
+                        if f not in file_max_chunks.keys():
+                            file_max_chunks[f] = max_chunks[f]
+                    dc_files[dc] = list(set([f.rsplit('_', 1)[0] for f in dc_ack]))
+                    for f_c in list(set(list(dc_ack) + list(file_log.keys()))):
+                        if f_c not in file_log.keys():
+                            file_log[f_c] = [dc]
+                        else:
+                            if f_c in dc_ack:
+                                if dc not in file_log[f_c]:
+                                    file_log[f_c].append(dc)
+                            else:
+                                if dc in file_log[f_c]:
+                                    file_log[f_c].remove(dc)
+
+                    print(dc_files, "\n", file_max_chunks, "\n", file_log)
+                except:
+                    print("node dead")
+        sleep(5)
 
 if __name__ == '__main__':
     t1 = Thread(target=serve)
     t2 = Thread(target=client)
+    t3 = Thread(target=checkDcHealth)
     
     t1.start()
     t2.start()
+    t3.start()

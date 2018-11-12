@@ -29,6 +29,29 @@ message Vote
 message AckHB
 {
     string ack = 1;
+    repeated string dcAck = 2;
+    map<string, int64> maxChunks = 3;
+}
+
+// message ChunkList
+// {
+//     repeated int64 chunks = 1;
+// }
+
+message FileChunk
+{
+    string fileName = 1;
+    int64 chunk = 2;
+}
+
+message DcList
+{
+    repeated string dcs = 1;
+}
+
+message Log
+{
+    map<string, DcList> fileLog = 1;
 }
 
 message Empty
