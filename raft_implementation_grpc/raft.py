@@ -42,14 +42,11 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
             if my_term > voteReq.currentTerm or my_state == States.Leader:
                 return Vote(voted=False, currentTerm=my_term)
             else:
-                if my_term > voteReq.currentTerm or my_state == States.Leader:
+                if my_vote and my_term == voteReq.currentTerm:
                     return Vote(voted=False, currentTerm=my_term)
                 else:
-                    if my_vote and my_term == voteReq.currentTerm:
-                        return Vote(voted=False, currentTerm=my_term)
-                    else:
-                        my_term = voteReq.currentTerm
-                        return Vote(voted=True, currentTerm=my_term)
+                    my_term = voteReq.currentTerm
+                    return Vote(voted=True, currentTerm=my_term)
 
     def AppendEntries(self):
         pass
@@ -170,7 +167,7 @@ def timer():
     global delay, hb_recv, vr_recv, my_term, my_state
     if my_term == 1:
         #print("in timer -> if")
-        sleep(uniform(1.0, 1.5))
+        sleep(uniform(2.0, 2.5))
     else:
         while True:
             print("Waiting for heartbeat", my_state.name, my_term)
