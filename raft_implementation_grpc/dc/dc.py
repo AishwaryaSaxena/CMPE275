@@ -1,6 +1,6 @@
 import sys, os
 from os.path import isfile, join
-sys.path.append("/home/sai/Downloads/CMPE275/raft_implementation_grpc")
+sys.path.append("/home/tejak/Documents/275/CMPE275/raft_implementation_grpc")
 import file_transfer_pb2
 import file_transfer_pb2_grpc
 import raft_pb2_grpc
@@ -15,14 +15,24 @@ dc_resp = []
 file_max_chunks = {}
 
 class DataCenter(file_transfer_pb2_grpc.DataTransferServiceServicer, raft_pb2_grpc.raftImplemetationServicer):
-    def RequestFileInfo(self, FileInfo, context):
+    def RequestFileInfo(self, fileInfo, context):
         pass
     
-    def GetFileLocation(self, Fileinfo, context):
+    def GetFileLocation(self, fileinfo, context):
         pass
     
-    def DownloadChunk(self, ChunkInfo, context):
-        pass
+    def DownloadChunk(self, chunkInfo, context):
+        seq_list = []
+        file_name = chunkInfo.fileName
+        chunk_id = chunkInfo.chunkId
+        start_seq_num = chunkInfo.startSeqNum
+        with open(file_name+'_'+str(chunk_id), 'rb') as f:
+            seq_num = 0
+            for chunk in iter(lambda: f.read(1024*1024), b""):
+                seq_list.append(chunk)
+                seq_num += 1
+        for i in range(start_seq_num, len(seq_list)):
+            yield file_transfer_pb2.FileMetaData(fileName=file_name, chunkId=chunk_id, data=seq_list[i], seqNum=i, seqMax=seq_num)
 
     def UploadFile(self, FileUploadData_stream, context):
         global file_max_chunks

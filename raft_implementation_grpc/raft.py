@@ -117,8 +117,10 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
             else:
                 return FileLocationInfo(fileName = fileName, maxChunks = 0, lstProxy = [], isFileFound = False)
     
-    def DownloadChunk(self, ChunkInfo, context):
-        pass
+    def DownloadChunk(self, chunkInfo, context):
+        dc_list = file_log[chunkInfo.fileName + "_" + str(chunkInfo.chunkId)]
+        dc_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(dc_list[0]))
+        return dc_stub.DownloadChunk(chunkInfo)
 
     def UploadFile(self, FileUploadData_stream, context):
         dc = findDataCenter()
