@@ -9,7 +9,6 @@ import sys
 from enum import Enum
 from file_transfer_pb2 import FileLocationInfo, ProxyInfo, FileList, RequestFileList
 import file_transfer_pb2_grpc
-from google.protobuf.json_format import MessageToDict
 
 class States(Enum):
     Follower = 1
@@ -23,38 +22,52 @@ my_term = 1
 my_state = States.Follower
 delay = uniform(1.0, 1.5)
 stubs = []
-friends = ["localhost:4001", "localhost:4002"]
-external_nodes = ["localhost:4003"]
+# friends = ["10.0.40.1:10000", "10.0.40.2:10000", "10.0.40.2:10001", "10.0.40.2:10002"]
+external_nodes = ["10.0.10.1:10000", "10.0.10.2:10000", "10.0.10.3:10000", "10.0.10.2:10001", "10.0.10.3:10001", "10.0.30.3:9000"]
 hb_recv = False
-vr_recv = False
-# friends = ["localhost:4001", "localhost:4002", "localhost:4003", "localhost:4004"]
-dcs = ["localhost:5000", "localhost:5001", "localhost:5002", "localhost:5003", "localhost:5004"]
+# vr_recv = False
+friends = ["localhost:4001", "localhost:4002", "localhost:4003", "localhost:4004"]
+dcs = ["localhost:5000", "localhost:5001"]
 dc_files = {}
 file_max_chunks = {}
 file_log = {}
 
 class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.DataTransferServiceServicer):
     def RequestVote(self, voteReq, context):
-        global vr_recv, my_state, my_term, hb_recv, my_vote
-        if hb_recv == True:
+        global my_state, my_term, hb_recv, my_vote
+        if hb_recv == True or my_state == States.Leader:
             return Vote(voted=False, currentTerm=my_term)
+        elif my_state == States.Follower:
+            if my_vote:
+                if my_term > voteReq.currentTerm:
+                    return Vote(voted=False, currentTerm=my_term)
+                my_term = voteReq.currentTerm
+                return Vote(voted=True, currentTerm=my_term)
+            my_term = voteReq.currentTerm
+            return Vote(voted=True, currentTerm=my_term)
         else:
-            if my_term > voteReq.currentTerm or my_state == States.Leader:
+            if my_vote:
+                if my_term < voteReq.currentTerm:
+                    if my_state == States.Follower:
+                        my_term = voteReq.currentTerm
+                    my_state = States.Follower
+                    return Vote(voted=True, currentTerm=my_term)
                 return Vote(voted=False, currentTerm=my_term)
             else:
-                if my_vote and my_term == voteReq.currentTerm:
+                if my_term > voteReq.currentTerm:
                     return Vote(voted=False, currentTerm=my_term)
                 else:
                     my_term = voteReq.currentTerm
-                    return Vote(voted=True, currentTerm=my_term)
+                    return Vote(voted=False, currentTerm=my_term)
 
     def AppendEntries(self):
         pass
     
     def SendHeartBeat(self, hearBeat, context):
-        global hb_recv, my_state, my_term, vr_recv, file_log, file_max_chunks, leader_id
+        global hb_recv, my_state, my_term, file_log, file_max_chunks, leader_id, my_vote
         hb_recv = True
-        vr_recv = False
+        # vr_recv = False
+        my_vote = True
         my_state = States.Follower
         my_term = hearBeat.currentTerm
         leader_id = hearBeat.id
@@ -62,6 +75,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
         for file_key in file_log.keys(): 
             file_log[file_key] = list(file_log[file_key].dcs)
         file_max_chunks = dict(hearBeat.log.maxChunks)
+        # print("HeartBeat received")
         return AckHB(ack="StillAlive")
     
     def RequestFileInfo(self, FileInfo, context):
@@ -157,9 +171,8 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
             else:
                 return FileList(lstFileNames = list(file_list))
 
-
 def findDataCenter():
-    return "localhost:5000"
+    return "10.0.40.1:5001"
     #######TODO######## find datacenter by available space and upload to multiple data centers
 
 def findProxies():
@@ -179,16 +192,15 @@ def serve():
         sys.exit(1)
 
 def client():
-    global my_id, my_vote, my_term, my_state, stubs, friends, delay, hb_recv, vr_recv
+    global my_id, my_vote, my_term, my_state, stubs, friends, delay, hb_recv
     while True:
         print(my_state.name, my_term)
         if my_state == States.Leader:
             leaderActions()
         else:
             timer()
-            if not hb_recv and not vr_recv:
+            if not hb_recv:
                 if my_state == States.Follower:
-                    #print("in client -> while -> else -> if -> if")
                     my_state = States.Candidate
                     my_term += 1
                     my_vote = True
@@ -196,30 +208,22 @@ def client():
                 else:
                     my_term += 1
                     my_vote = True
-                    #print("in client -> while -> else -> if -> else")
                     startElection()
 
-
 def timer():
-    global delay, hb_recv, vr_recv, my_term, my_state
+    global delay, hb_recv, my_term, my_state, my_vote
     if my_term == 1:
         #print("in timer -> if")
-        sleep(uniform(2.0, 2.5))
+        sleep(uniform(1.0, 1.5))
     else:
         while True:
             print("Waiting for heartbeat", my_state.name, my_term)
             print(file_log, file_max_chunks)
-            #print("in timer -> else -> while")
             if hb_recv:
                 hb_recv = False
-                #print("in timer -> else -> while -> if")
-                sleep(uniform(1.0, 1.5))
-            elif vr_recv:
-                vr_recv = False
-                #print("in timer -> else -> while -> elif")
+                my_vote = False
                 sleep(uniform(1.0, 1.5))
             else:
-                #print("in timer -> else -> while -> else")
                 sleep(uniform(1.0, 1.5))
                 break
 
@@ -228,22 +232,16 @@ def startElection():
     vote_count = 1
     vote = ""
     stubs = []
-    #print("in startElection")
     for friend in friends:
         stubs.append(raft_pb2_grpc.raftImplemetationStub(grpc.insecure_channel(friend)))
     for stub in stubs:
         try:
-            #print("in startElection RequestVote stub call")
             vote = stub.RequestVote(VoteReq(id=my_id, currentTerm=my_term), timeout=0.1)
             if vote.voted:
-                #print("in startElection -> for -> try -> if")
                 vote_count += 1
             else:
-                #print("in startElection -> for -> try -> else")
                 my_term = vote.currentTerm
         except:
-            #print("in startElection -> for -> except")
-            #print("node dead")
             pass
     #print("votes received: ", vote_count)
     if vote_count > (len(stubs)+1)//2:
@@ -252,29 +250,21 @@ def startElection():
     else:
         return
     
-
 def leaderActions():
     global my_state, stubs, my_id, my_term, file_log, file_max_chunks
     hb_ack = ""
     while my_state == States.Leader:
         print("Sending Heartbeats", my_state.name, my_term)
-        #print(file_log, file_max_chunks)
-        #print("in leaderActions -> while")
-        stub = ""
+        stubs = []
         for friend in friends:
-            stub = raft_pb2_grpc.raftImplemetationStub(grpc.insecure_channel(friend))
+            stubs.append(raft_pb2_grpc.raftImplemetationStub(grpc.insecure_channel(friend)))
+        for stub in stubs:
             try:
                 d = {}
                 for file_key in file_log.keys(): 
                     d[file_key] = DcList(dcs=file_log[file_key])
-                #print("in leaderActions -> while -> for -> try")
                 hb_ack = stub.SendHeartBeat(Heartbeat(id=my_id, currentTerm=my_term, log = Log(fileLog = d, maxChunks = file_max_chunks)), timeout=0.1)
-                #hb_ack = stub.SendHeartBeat(Heartbeat(id=my_id, currentTerm=my_term))
-                #print(hb_ack.ack)
             except Exception as e:
-                #print(e.__class__.__name__)
-                #print("in leaderActions -> while -> for -> except")
-                #print("node dead")
                 pass
         sleep(0.5)
 
@@ -283,7 +273,6 @@ def checkDcHealth():
     global my_state, dcs, my_id, dc_files, file_max_chunks, file_log
     while True:
         if my_state == States.Leader:
-            #stub = ""
             for dc in dcs:
                 stub = raft_pb2_grpc.raftImplemetationStub(grpc.insecure_channel(dc))
                 try:
