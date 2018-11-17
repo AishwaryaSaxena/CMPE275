@@ -1,6 +1,6 @@
 import raft_pb2_grpc
 from raft_pb2 import Heartbeat, VoteReq, Vote, AckHB, Empty, Log, DcList
-from random import uniform 
+from random import uniform, choice 
 from time import sleep
 import grpc
 from concurrent import futures
@@ -29,8 +29,10 @@ hb_recv = False
 friends = ["localhost:4001", "localhost:4002", "localhost:4003", "localhost:4004"]
 dcs = ["localhost:5000", "localhost:5001"]
 dc_files = {}
+live_dcs = []
 file_max_chunks = {}
 file_log = {}
+dc_sizes = {}
 
 class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.DataTransferServiceServicer):
     def RequestVote(self, voteReq, context):
@@ -64,7 +66,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
         pass
     
     def SendHeartBeat(self, hearBeat, context):
-        global hb_recv, my_state, my_term, file_log, file_max_chunks, leader_id, my_vote
+        global hb_recv, my_state, my_term, file_log, file_max_chunks, leader_id, my_vote, dc_sizes
         hb_recv = True
         # vr_recv = False
         my_vote = True
@@ -76,6 +78,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
             file_log[file_key] = list(file_log[file_key].dcs)
         file_max_chunks = dict(hearBeat.log.maxChunks)
         # print("HeartBeat received")
+        dc_sizes = dict(hearBeat.log.dcSizes)
         return AckHB(ack="StillAlive")
     
     def RequestFileInfo(self, FileInfo, context):
@@ -98,7 +101,10 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
                 for p in proxies:
                     ip_port = p.split(':')
                     proxies_ser.append(ProxyInfo(ip = ip_port[0], port = ip_port[1]))
-                return FileLocationInfo(fileName = fileName, maxChunks = file_max_chunks[fileName], lstProxy = proxies_ser, isFileFound = True)
+                try:
+                    return FileLocationInfo(fileName = fileName, maxChunks = file_max_chunks[fileName], lstProxy = proxies_ser, isFileFound = True)
+                except:
+                    return FileLocationInfo(fileName = fileName, maxChunks = 1, lstProxy = proxies_ser, isFileFound = True)
             else:
                 external_stub = ""
                 for n in external_nodes:
@@ -172,7 +178,16 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
                 return FileList(lstFileNames = list(file_list))
 
 def findDataCenter():
-    return "10.0.40.1:5001"
+    global dc_sizes
+    # return max(dc_sizes.keys(), key=(lambda k: dc_sizes[k]))
+    count = 0
+    weighted_random = []
+    for dc_size in sorted(dc_sizes.items(), key=lambda x: x[1]):
+        count += 1
+        if count < 4:
+            weighted_random.append(dc_size[0])
+    return choice(weighted_random)
+    # return "10.0.40.1:5001"
     #######TODO######## find datacenter by available space and upload to multiple data centers
 
 def findProxies():
@@ -218,7 +233,7 @@ def timer():
     else:
         while True:
             print("Waiting for heartbeat", my_state.name, my_term)
-            print(file_log, file_max_chunks)
+            print(file_log, file_max_chunks, dc_sizes)
             if hb_recv:
                 hb_recv = False
                 my_vote = False
@@ -251,7 +266,7 @@ def startElection():
         return
     
 def leaderActions():
-    global my_state, stubs, my_id, my_term, file_log, file_max_chunks
+    global my_state, stubs, my_id, my_term, file_log, file_max_chunks, dc_sizes
     hb_ack = ""
     while my_state == States.Leader:
         print("Sending Heartbeats", my_state.name, my_term)
@@ -263,20 +278,20 @@ def leaderActions():
                 d = {}
                 for file_key in file_log.keys(): 
                     d[file_key] = DcList(dcs=file_log[file_key])
-                hb_ack = stub.SendHeartBeat(Heartbeat(id=my_id, currentTerm=my_term, log = Log(fileLog = d, maxChunks = file_max_chunks)), timeout=0.1)
+                hb_ack = stub.SendHeartBeat(Heartbeat(id=my_id, currentTerm=my_term, log = Log(fileLog = d, maxChunks = file_max_chunks, dcSizes = dc_sizes)), timeout=0.1)
             except Exception as e:
                 pass
         sleep(0.5)
 
 def checkDcHealth():
-    ######TODO remove key also from file log if file removed
-    global my_state, dcs, my_id, dc_files, file_max_chunks, file_log
+    global my_state, dcs, my_id, dc_files, file_max_chunks, file_log, live_dcs, dc_sizes
     while True:
         if my_state == States.Leader:
             for dc in dcs:
                 stub = raft_pb2_grpc.raftImplemetationStub(grpc.insecure_channel(dc))
                 try:
                     hb_ack = stub.SendHeartBeat(Heartbeat(id=my_id), timeout=0.1)
+                    dc_sizes[dc] = hb_ack.sizeAvail
                     dc_ack = list(hb_ack.dcAck)
                     max_chunks = dict(hb_ack.maxChunks)
                     for f in max_chunks.keys():
@@ -293,10 +308,17 @@ def checkDcHealth():
                             else:
                                 if dc in file_log[f_c]:
                                     file_log[f_c].remove(dc)
+                    if dc not in live_dcs:
+                        live_dcs.append(dc)
 
                     #print(dc_files, "\n", file_max_chunks, "\n", file_log)
                 except:
-                    print("dc dead")
+                    for f_c in list(file_log.keys()):
+                        if dc in file_log[f_c]:
+                            file_log[f_c].remove(dc)
+                    if dc in live_dcs:
+                        live_dcs.remove(dc)
+                    # print("dc dead")
         sleep(5)
 
 

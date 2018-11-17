@@ -32,6 +32,7 @@ message AckHB
     string ack = 1;
     repeated string dcAck = 2;
     map<string, int64> maxChunks = 3;
+    int64 sizeAvail = 4;
 }
 
 message DcList
@@ -43,6 +44,7 @@ message Log
 {
     map<string, DcList> fileLog = 1;
     map<string, int64> maxChunks = 2;
+    map<string, int64> dcSizes = 3;
 }
 
 message Empty

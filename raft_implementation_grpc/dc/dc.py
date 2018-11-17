@@ -13,6 +13,7 @@ from threading import Thread, Event
 my_id = "localhost:5000"
 dc_resp = []
 file_max_chunks = {}
+size_avail = 0
 
 class DataCenter(file_transfer_pb2_grpc.DataTransferServiceServicer, raft_pb2_grpc.raftImplemetationServicer):
     def RequestFileInfo(self, fileInfo, context):
@@ -59,14 +60,16 @@ class DataCenter(file_transfer_pb2_grpc.DataTransferServiceServicer, raft_pb2_gr
         pass
 
     def SendHeartBeat(self, hearBeat, context):
-        return AckHB(dcAck = dc_resp, maxChunks = file_max_chunks)
+        global size_avail
+        return AckHB(dcAck = dc_resp, maxChunks = file_max_chunks, sizeAvail = size_avail)
 
     ###TODO replication
 
 def checkFiles():
-    global dc_resp
+    global dc_resp, size_avail
     while True:
         dc_resp = [f for f in os.listdir() if isfile(join(".",f)) and f != "dc.py"]
+        size_avail = os.statvfs('/home/tejak/Documents').f_frsize * os.statvfs('/home/tejak/Documents').f_bavail
         sleep(5)
 
 def serve():
