@@ -1,5 +1,5 @@
 import raft_pb2_grpc
-from raft_pb2 import Heartbeat, VoteReq, Vote, AckHB, Empty, Log, DcList
+from raft_pb2 import Heartbeat, VoteReq, Vote, AckHB, Empty, Log, DcList, ReplicateFileInfo
 from random import uniform, choice 
 from time import sleep
 import grpc
@@ -15,6 +15,7 @@ class States(Enum):
     Candidate = 2
     Leader = 3
 
+replication_factor = 3
 my_id = "localhost:4000"
 leader_id = ""
 my_vote = False
@@ -27,12 +28,12 @@ external_nodes = ["10.0.10.1:10000", "10.0.10.2:10000", "10.0.10.3:10000", "10.0
 hb_recv = False
 # vr_recv = False
 friends = ["localhost:4001", "localhost:4002", "localhost:4003", "localhost:4004"]
-dcs = ["localhost:5000", "localhost:5001"]
+dcs = ["localhost:5000", "localhost:5001", "localhost:5002", "localhost:5003", "localhost:5004"]
 dc_files = {}
-live_dcs = []
 file_max_chunks = {}
 file_log = {}
 dc_sizes = {}
+live_nodes = []
 
 class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.DataTransferServiceServicer):
     def RequestVote(self, voteReq, context):
@@ -143,6 +144,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
         return dc_stub.DownloadChunk(chunkInfo)
 
     def UploadFile(self, FileUploadData_stream, context):
+        #TODO overwrite existing file
         dc = findDataCenter()
         dc_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(dc))
         return dc_stub.UploadFile(FileUploadData_stream)
@@ -177,9 +179,14 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
             else:
                 return FileList(lstFileNames = list(file_list))
 
+    def ReplicateFile(self, replicateFileInfo, context):
+        pass
+    
+    def DeleteFile(self, replicateFileInfo, context):
+        pass
+
 def findDataCenter():
     global dc_sizes
-    # return max(dc_sizes.keys(), key=(lambda k: dc_sizes[k]))
     count = 0
     weighted_random = []
     for dc_size in sorted(dc_sizes.items(), key=lambda x: x[1]):
@@ -187,11 +194,10 @@ def findDataCenter():
         if count < 4:
             weighted_random.append(dc_size[0])
     return choice(weighted_random)
-    # return "10.0.40.1:5001"
-    #######TODO######## find datacenter by available space and upload to multiple data centers
+    ##TODO if the file already exists, return the DC that consists the file
 
 def findProxies():
-    return friends
+    return live_nodes
 
 def serve():
     raft = RaftImpl()
@@ -229,11 +235,11 @@ def timer():
     global delay, hb_recv, my_term, my_state, my_vote
     if my_term == 1:
         #print("in timer -> if")
-        sleep(uniform(1.0, 1.5))
+        sleep(uniform(1.5, 2.0))
     else:
         while True:
             print("Waiting for heartbeat", my_state.name, my_term)
-            print(file_log, file_max_chunks, dc_sizes)
+            print(file_log, file_max_chunks)
             if hb_recv:
                 hb_recv = False
                 my_vote = False
@@ -258,7 +264,6 @@ def startElection():
                 my_term = vote.currentTerm
         except:
             pass
-    #print("votes received: ", vote_count)
     if vote_count > (len(stubs)+1)//2:
         my_state = States.Leader
         return
@@ -266,25 +271,29 @@ def startElection():
         return
     
 def leaderActions():
-    global my_state, stubs, my_id, my_term, file_log, file_max_chunks, dc_sizes
+    global my_state, stubs, my_id, my_term, file_log, file_max_chunks, dc_sizes, live_nodes
     hb_ack = ""
     while my_state == States.Leader:
         print("Sending Heartbeats", my_state.name, my_term)
+        print("live_nodes: ", live_nodes)
         stubs = []
         for friend in friends:
             stubs.append(raft_pb2_grpc.raftImplemetationStub(grpc.insecure_channel(friend)))
-        for stub in stubs:
+        for i in range(len(stubs)):
             try:
                 d = {}
                 for file_key in file_log.keys(): 
                     d[file_key] = DcList(dcs=file_log[file_key])
-                hb_ack = stub.SendHeartBeat(Heartbeat(id=my_id, currentTerm=my_term, log = Log(fileLog = d, maxChunks = file_max_chunks, dcSizes = dc_sizes)), timeout=0.1)
-            except Exception as e:
-                pass
+                hb_ack = stubs[i].SendHeartBeat(Heartbeat(id=my_id, currentTerm=my_term, log = Log(fileLog = d, maxChunks = file_max_chunks, dcSizes = dc_sizes)), timeout=0.1)
+                if friends[i] not in live_nodes:
+                    live_nodes.append(friends[i])
+            except:
+                if friends[i] in live_nodes:
+                    live_nodes.remove(friends[i])
         sleep(0.5)
 
 def checkDcHealth():
-    global my_state, dcs, my_id, dc_files, file_max_chunks, file_log, live_dcs, dc_sizes
+    global my_state, dcs, my_id, dc_files, file_max_chunks, file_log, dc_sizes
     while True:
         if my_state == States.Leader:
             for dc in dcs:
@@ -308,26 +317,57 @@ def checkDcHealth():
                             else:
                                 if dc in file_log[f_c]:
                                     file_log[f_c].remove(dc)
-                    if dc not in live_dcs:
-                        live_dcs.append(dc)
-
+                    # TODO remove live_dcs and add live_nodes
                     #print(dc_files, "\n", file_max_chunks, "\n", file_log)
                 except:
                     for f_c in list(file_log.keys()):
                         if dc in file_log[f_c]:
                             file_log[f_c].remove(dc)
-                    if dc in live_dcs:
-                        live_dcs.remove(dc)
+                    if dc in dc_sizes.keys():
+                        del dc_sizes[dc]
                     # print("dc dead")
-        sleep(5)
+        sleep(3)
+
+
+def replicationHandler():
+    while True:
+        if my_state == States.Leader:
+            for f_c in list(file_log.keys()):
+                if len(file_log[f_c]) < replication_factor and len(file_log[f_c]) != 0:
+                    dest_dcs = list( set(dc_sizes.keys()) - set(file_log[f_c]) )
+                    if len(dest_dcs) <= (replication_factor - len(file_log[f_c])):
+                        for dest_dc in dest_dcs:
+                            try:
+                                replication_stub = raft_pb2_grpc.raftImplemetationStub(grpc.insecure_channel(dest_dc))
+                                replication_stub.ReplicateFile(ReplicateFileInfo(fileChunk = f_c, dcAddr = choice(file_log[f_c])), timeout=0.2)
+                            except:
+                                pass
+                    else:
+                        for i in range(replication_factor - len(file_log[f_c])):
+                            try:
+                                replication_stub = raft_pb2_grpc.raftImplemetationStub(grpc.insecure_channel(dest_dcs[i]))
+                                replication_stub.ReplicateFile(ReplicateFileInfo(fileChunk = f_c, dcAddr = choice(file_log[f_c])), timeout=0.2)
+                            except:
+                                pass
+                elif len(file_log[f_c]) == replication_factor:
+                    pass
+                else:
+                    try:
+                        delete_stub =  raft_pb2_grpc.raftImplemetationStub(grpc.insecure_channel(choice(file_log[f_c])))
+                        delete_stub.DeleteFile(ReplicateFileInfo(fileChunk = f_c))
+                    except:
+                        pass
+        sleep(3)
 
 
 if __name__ == '__main__':
     t1 = Thread(target=serve)
     t2 = Thread(target=client)
     t3 = Thread(target=checkDcHealth)
+    t4 = Thread(target=replicationHandler)
     
     t1.start()
     t2.start()
     t3.start()
+    t4.start()
     

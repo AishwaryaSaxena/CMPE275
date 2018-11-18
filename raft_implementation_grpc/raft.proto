@@ -5,6 +5,14 @@ service raftImplemetation
     rpc RequestVote (VoteReq) returns (Vote);
     rpc AppendEntries (Empty) returns (Empty);
     rpc SendHeartBeat (Heartbeat) returns (AckHB);
+    rpc ReplicateFile (ReplicateFileInfo) returns (Empty);
+    rpc DeleteFile (ReplicateFileInfo) returns (Empty);
+}
+
+message ReplicateFileInfo
+{
+    string fileChunk = 1;
+    string dcAddr = 2;
 }
 
 message Heartbeat

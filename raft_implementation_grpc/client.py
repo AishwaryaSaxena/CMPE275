@@ -5,7 +5,7 @@ from os.path import isfile, join
 import ntpath
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-#import pyinotify
+import pyinotify
 
 stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel("localhost:4000"))
 
@@ -61,54 +61,54 @@ class MyEventHandler(pyinotify.ProcessEvent):
             threading.Thread(target=callupload2, args=(iter_list[1],)).start()
             threading.Thread(target=callupload3, args=(iter_list[2],)).start()
 
-class Watcher:
-    DIRECTORY_TO_WATCH = "/home/tejak/Desktop/CMPE275/raft_implementation_grpc/uploads"
+# class Watcher:
+#     DIRECTORY_TO_WATCH = "/home/tejak/Desktop/CMPE275/raft_implementation_grpc/uploads"
 
-    def __init__(self):
-        self.observer = Observer()
+#     def __init__(self):
+#         self.observer = Observer()
 
-    def run(self):
-        event_handler = Handler()
-        self.observer.schedule(event_handler, self.DIRECTORY_TO_WATCH, recursive=True)
-        self.observer.start()
-        try:
-            while True:
-                sleep(5)
-        except:
-            self.observer.stop()
-            print ("Error")
+#     def run(self):
+#         event_handler = Handler()
+#         self.observer.schedule(event_handler, self.DIRECTORY_TO_WATCH, recursive=True)
+#         self.observer.start()
+#         try:
+#             while True:
+#                 sleep(5)
+#         except:
+#             self.observer.stop()
+#             print ("Error")
 
-        self.observer.join()
+#         self.observer.join()
 
 
-class Handler(FileSystemEventHandler):
+# class Handler(FileSystemEventHandler):
 
-    #@staticmethod
-    def on_created(self, event):
-        if event.is_directory:
-            return None
-        else:
-            sleep(10)
-            # print ("Received created event - %s." % event.src_path)
-            with open(event.src_path, "rb") as f:
-                seq_list = []
-                fn = path_leaf(event.src_path)
-                for seq in iter(lambda: f.read(1024*1024), b""):
-                    seq_list.append(file_transfer_pb2.FileUploadData(fileName=fn, data=seq))
+#     #@staticmethod
+#     def on_created(self, event):
+#         if event.is_directory:
+#             return None
+#         else:
+#             sleep(10)
+#             # print ("Received created event - %s." % event.src_path)
+#             with open(event.src_path, "rb") as f:
+#                 seq_list = []
+#                 fn = path_leaf(event.src_path)
+#                 for seq in iter(lambda: f.read(1024*1024), b""):
+#                     seq_list.append(file_transfer_pb2.FileUploadData(fileName=fn, data=seq))
                         
-                list_1, list_2, list_3 = seq_list[:len(seq_list)//3], seq_list[len(seq_list)//3:(len(seq_list)//3)*2], seq_list[(len(seq_list)//3)*2:]
-                list_1 = [file_transfer_pb2.FileUploadData(fileName=fn, data=fud.data, chunkId = 1, maxChunks = 3) for fud in list_1]
-                list_2 = [file_transfer_pb2.FileUploadData(fileName=fn, data=fud.data, chunkId = 2, maxChunks = 3) for fud in list_2]
-                list_3 = [file_transfer_pb2.FileUploadData(fileName=fn, data=fud.data, chunkId = 3, maxChunks = 3) for fud in list_3]
-                iter_list = [gen_stream(list_1), gen_stream(list_2), gen_stream(list_3)]
+#                 list_1, list_2, list_3 = seq_list[:len(seq_list)//3], seq_list[len(seq_list)//3:(len(seq_list)//3)*2], seq_list[(len(seq_list)//3)*2:]
+#                 list_1 = [file_transfer_pb2.FileUploadData(fileName=fn, data=fud.data, chunkId = 1, maxChunks = 3) for fud in list_1]
+#                 list_2 = [file_transfer_pb2.FileUploadData(fileName=fn, data=fud.data, chunkId = 2, maxChunks = 3) for fud in list_2]
+#                 list_3 = [file_transfer_pb2.FileUploadData(fileName=fn, data=fud.data, chunkId = 3, maxChunks = 3) for fud in list_3]
+#                 iter_list = [gen_stream(list_1), gen_stream(list_2), gen_stream(list_3)]
 
-                threading.Thread(target=callupload1, args=(iter_list[0],)).start()
-                threading.Thread(target=callupload2, args=(iter_list[1],)).start()
-                threading.Thread(target=callupload3, args=(iter_list[2],)).start()
+#                 threading.Thread(target=callupload1, args=(iter_list[0],)).start()
+#                 threading.Thread(target=callupload2, args=(iter_list[1],)).start()
+#                 threading.Thread(target=callupload3, args=(iter_list[2],)).start()
 
-def run1():
-    w = Watcher()
-    w.run()
+# def run1():
+#     w = Watcher()
+#     w.run()
 
 def path_leaf(path):
     head, tail = ntpath.split(path)
@@ -139,6 +139,6 @@ def callupload3(it):
     stub.UploadFile(it)
 
 if __name__ == '__main__':
-    #run()    # use this for linux based platforms, uncomment pyinotify at the top
-    run1()    # use this for cross platform
+    run()    # use this for linux based platforms, uncomment pyinotify at the top
+    # run1()    # use this for cross platform
     #download() # get the list of file, and download each one if necessary

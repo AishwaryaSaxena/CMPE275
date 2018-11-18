@@ -9,11 +9,13 @@ from time import sleep
 import grpc
 from concurrent import futures
 from threading import Thread, Event
+from collections import deque
 
 my_id = "localhost:5000"
 dc_resp = []
 file_max_chunks = {}
 size_avail = 0
+dc_path = '/home/tejak/Documents'
 
 class DataCenter(file_transfer_pb2_grpc.DataTransferServiceServicer, raft_pb2_grpc.raftImplemetationServicer):
     def RequestFileInfo(self, fileInfo, context):
@@ -63,14 +65,31 @@ class DataCenter(file_transfer_pb2_grpc.DataTransferServiceServicer, raft_pb2_gr
         global size_avail
         return AckHB(dcAck = dc_resp, maxChunks = file_max_chunks, sizeAvail = size_avail)
 
-    ###TODO replication
+    def ReplicateFile(self, replicateFileInfo, context):
+        file_name, chunk_id = replicateFileInfo.fileChunk.rsplit("_", 1)
+        try:
+            replication_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(replicateFileInfo.dcAddr))
+            resps = replication_stub.DownloadChunk(file_transfer_pb2.ChunkInfo(fileName=file_name, chunkId=int(chunk_id)))
+        except:
+            pass
+        with open(replicateFileInfo.fileChunk, "wb") as f:
+            for resp in resps:
+                f.write(resp.data)
+        return Empty()
+    
+    def DeleteFile(self, replicateFileInfo, context):
+        try:
+            os.remove(replicateFileInfo.fileChunk)
+        except:
+            pass
+        return Empty()
 
 def checkFiles():
     global dc_resp, size_avail
     while True:
         dc_resp = [f for f in os.listdir() if isfile(join(".",f)) and f != "dc.py"]
-        size_avail = os.statvfs('/home/tejak/Documents').f_frsize * os.statvfs('/home/tejak/Documents').f_bavail
-        sleep(5)
+        size_avail = os.statvfs(dc_path).f_frsize * os.statvfs(dc_path).f_bavail
+        sleep(3)
 
 def serve():
     dc = DataCenter()
