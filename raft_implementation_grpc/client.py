@@ -7,7 +7,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import pyinotify
 
-stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel("localhost:4000"))
+stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel("10.0.40.2:10000"))
 
 def download():
     global stub    
@@ -25,7 +25,7 @@ def download():
     d = {}
     if file_loc_info.isFileFound:
         with open("downloads/"+file_loc_info.fileName, "wb") as f:
-            for i in range(1, file_loc_info.maxChunks+1):
+            for i in range(file_loc_info.maxChunks):
                 resps = stub.DownloadChunk(file_transfer_pb2.ChunkInfo(fileName=file_loc_info.fileName, chunkId=i))
                 for resp in resps:
                     f.write(resp.data)
@@ -52,9 +52,9 @@ class MyEventHandler(pyinotify.ProcessEvent):
                 seq_list.append(file_transfer_pb2.FileUploadData(fileName=fn, data=seq))
                     
             list_1, list_2, list_3 = seq_list[:len(seq_list)//3], seq_list[len(seq_list)//3:(len(seq_list)//3)*2], seq_list[(len(seq_list)//3)*2:]
-            list_1 = [file_transfer_pb2.FileUploadData(fileName=fn, data=fud.data, chunkId = 1, maxChunks = 3) for fud in list_1]
-            list_2 = [file_transfer_pb2.FileUploadData(fileName=fn, data=fud.data, chunkId = 2, maxChunks = 3) for fud in list_2]
-            list_3 = [file_transfer_pb2.FileUploadData(fileName=fn, data=fud.data, chunkId = 3, maxChunks = 3) for fud in list_3]
+            list_1 = [file_transfer_pb2.FileUploadData(fileName=fn, data=fud.data, chunkId = 0, maxChunks = 3) for fud in list_1]
+            list_2 = [file_transfer_pb2.FileUploadData(fileName=fn, data=fud.data, chunkId = 1, maxChunks = 3) for fud in list_2]
+            list_3 = [file_transfer_pb2.FileUploadData(fileName=fn, data=fud.data, chunkId = 2, maxChunks = 3) for fud in list_3]
             iter_list = [gen_stream(list_1), gen_stream(list_2), gen_stream(list_3)]
 
             threading.Thread(target=callupload1, args=(iter_list[0],)).start()

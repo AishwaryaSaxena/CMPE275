@@ -16,19 +16,21 @@ class States(Enum):
     Leader = 3
 
 replication_factor = 3
-my_id = "localhost:4000"
+# my_id = "localhost:4000"
+my_id = "10.0.40.1:10000"
 leader_id = ""
 my_vote = False
 my_term = 1
 my_state = States.Follower
 delay = uniform(1.0, 1.5)
 stubs = []
-# friends = ["10.0.40.1:10000", "10.0.40.2:10000", "10.0.40.2:10001", "10.0.40.2:10002"]
+friends = ["10.0.40.2:10001", "10.0.40.2:10000", "10.0.40.3:10000", "10.0.40.4:10000"]
 external_nodes = ["10.0.10.1:10000", "10.0.10.2:10000", "10.0.10.3:10000", "10.0.10.2:10001", "10.0.10.3:10001", "10.0.30.3:9000"]
 hb_recv = False
 # vr_recv = False
-friends = ["localhost:4001", "localhost:4002", "localhost:4003", "localhost:4004"]
-dcs = ["localhost:5000", "localhost:5001", "localhost:5002", "localhost:5003", "localhost:5004"]
+# friends = ["localhost:4001", "localhost:4002", "localhost:4003", "localhost:4004"]
+# dcs = ["localhost:5000", "localhost:5001", "localhost:5002", "localhost:5003", "localhost:5004"]
+dcs = ["10.0.40.1:5000", "10.0.40.2:5000", "10.0.40.3:5000", "10.0.40.4:5000", "10.0.40.2:5001"]
 dc_files = {}
 file_max_chunks = {}
 file_log = {}
@@ -235,7 +237,7 @@ def timer():
     global delay, hb_recv, my_term, my_state, my_vote
     if my_term == 1:
         #print("in timer -> if")
-        sleep(uniform(1.5, 2.0))
+        sleep(uniform(2.0, 2.5))
     else:
         while True:
             print("Waiting for heartbeat", my_state.name, my_term)

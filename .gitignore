@@ -12,3 +12,4 @@ raft_implementation_grpc/file_transfer_pb2.py
 raft_implementation_grpc/dc1
 raft_implementation_grpc/downloads/
 raft_implementation_grpc/uploads/
+raft_implementation_grpc/dc/.DS_Store

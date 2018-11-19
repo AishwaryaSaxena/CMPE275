@@ -11,7 +11,8 @@ from concurrent import futures
 from threading import Thread, Event
 from collections import deque
 
-my_id = "localhost:5000"
+# my_id = "localhost:5000"
+my_id = "10.0.40.1:5000"
 dc_resp = []
 file_max_chunks = {}
 size_avail = 0
@@ -70,11 +71,11 @@ class DataCenter(file_transfer_pb2_grpc.DataTransferServiceServicer, raft_pb2_gr
         try:
             replication_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(replicateFileInfo.dcAddr))
             resps = replication_stub.DownloadChunk(file_transfer_pb2.ChunkInfo(fileName=file_name, chunkId=int(chunk_id)))
+            with open(replicateFileInfo.fileChunk, "wb") as f:
+                for resp in resps:
+                    f.write(resp.data)
         except:
             pass
-        with open(replicateFileInfo.fileChunk, "wb") as f:
-            for resp in resps:
-                f.write(resp.data)
         return Empty()
     
     def DeleteFile(self, replicateFileInfo, context):
