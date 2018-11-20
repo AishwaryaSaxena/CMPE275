@@ -40,6 +40,7 @@ class DataCenter(file_transfer_pb2_grpc.DataTransferServiceServicer, raft_pb2_gr
 
     def UploadFile(self, FileUploadData_stream, context):
         global file_max_chunks
+        event.clear()
         fud = FileUploadData_stream.next()
         fileName = fud.fileName
         chunkId = str(fud.chunkId)
@@ -50,6 +51,7 @@ class DataCenter(file_transfer_pb2_grpc.DataTransferServiceServicer, raft_pb2_gr
             f.write(fud.data)
             for seq in FileUploadData_stream:
                 f.write(seq.data)
+        event.set()
         return file_transfer_pb2.FileInfo(fileName=fileName)
 
 
@@ -88,8 +90,10 @@ class DataCenter(file_transfer_pb2_grpc.DataTransferServiceServicer, raft_pb2_gr
 def checkFiles():
     global dc_resp, size_avail
     while True:
+        event.wait()
         dc_resp = [f for f in os.listdir() if isfile(join(".",f)) and f != "dc.py"]
         size_avail = os.statvfs(dc_path).f_frsize * os.statvfs(dc_path).f_bavail
+        print(dc_resp)
         sleep(3)
 
 def serve():
@@ -110,6 +114,8 @@ def client():
     print("dc working")
 
 if __name__ == '__main__':
+    event = Event()
+    event.set()
     t1 = Thread(target=serve)
     t2 = Thread(target=client)
     t3 = Thread(target=checkFiles)

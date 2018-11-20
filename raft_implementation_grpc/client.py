@@ -7,13 +7,13 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import pyinotify
 
-stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel("10.0.40.2:10000"))
+stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel("10.0.40.1:10000"))
 
 def download():
     global stub    
     ##Request File Info
     # sleep(1)
-    file_loc_info = stub.RequestFileInfo(file_transfer_pb2.FileInfo(fileName = "Suits.S02E01.720p.Web-DL.ReEnc-DeeJayAhmed.mkv"))
+    file_loc_info = stub.RequestFileInfo(file_transfer_pb2.FileInfo(fileName = "Windows.iso"))
     proxies = []
     for p in file_loc_info.lstProxy:
         proxies.append(p.ip + ":" + p.port)
@@ -141,4 +141,4 @@ def callupload3(it):
 if __name__ == '__main__':
     run()    # use this for linux based platforms, uncomment pyinotify at the top
     # run1()    # use this for cross platform
-    #download() # get the list of file, and download each one if necessary
+    # download() # get the list of file, and download each one if necessary

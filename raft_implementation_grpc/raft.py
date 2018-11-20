@@ -24,13 +24,13 @@ my_term = 1
 my_state = States.Follower
 delay = uniform(1.0, 1.5)
 stubs = []
-friends = ["10.0.40.2:10001", "10.0.40.2:10000", "10.0.40.3:10000", "10.0.40.4:10000"]
+friends = ["10.0.40.1:10001", "10.0.40.2:10000", "10.0.40.3:10000", "10.0.40.4:10000"]
 external_nodes = ["10.0.10.1:10000", "10.0.10.2:10000", "10.0.10.3:10000", "10.0.10.2:10001", "10.0.10.3:10001", "10.0.30.3:9000"]
 hb_recv = False
 # vr_recv = False
 # friends = ["localhost:4001", "localhost:4002", "localhost:4003", "localhost:4004"]
 # dcs = ["localhost:5000", "localhost:5001", "localhost:5002", "localhost:5003", "localhost:5004"]
-dcs = ["10.0.40.1:5000", "10.0.40.2:5000", "10.0.40.3:5000", "10.0.40.4:5000", "10.0.40.2:5001"]
+dcs = ["10.0.40.1:5000", "10.0.40.2:5000", "10.0.40.3:5000", "10.0.40.4:5000", "10.0.40.1:5001"]
 dc_files = {}
 file_max_chunks = {}
 file_log = {}
@@ -189,13 +189,13 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
 
 def findDataCenter():
     global dc_sizes
-    count = 0
-    weighted_random = []
-    for dc_size in sorted(dc_sizes.items(), key=lambda x: x[1]):
-        count += 1
-        if count < 4:
-            weighted_random.append(dc_size[0])
-    return choice(weighted_random)
+    # count = 0
+    # weighted_random = []
+    # for dc_size in sorted(dc_sizes.items(), key=lambda x: x[1]):
+    #     count += 1
+    #     if count < 4:
+    #         weighted_random.append(dc_size[0])
+    return choice(dc_sizes.keys())
     ##TODO if the file already exists, return the DC that consists the file
 
 def findProxies():
