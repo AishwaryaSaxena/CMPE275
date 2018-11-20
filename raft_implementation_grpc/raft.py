@@ -25,7 +25,7 @@ my_state = States.Follower
 delay = uniform(1.0, 1.5)
 stubs = []
 friends = ["10.0.40.2:10001", "10.0.40.2:10000", "10.0.40.3:10000", "10.0.40.4:10000"]
-external_nodes = ["10.0.10.1:10000", "10.0.10.2:10000", "10.0.10.3:10000", "10.0.10.2:10001", "10.0.10.3:10001", "10.0.30.3:9000"]
+external_nodes = ["10.0.10.1:10000", "10.0.10.2:10000", "10.0.10.3:10000", "10.0.10.2:10001", "10.0.10.3:10001", "10.0.30.1:10000", "10.0.30.2:10000", "10.0.30.3:10000", "10.0.30.4:10000"]
 hb_recv = False
 # vr_recv = False
 # friends = ["localhost:4001", "localhost:4002", "localhost:4003", "localhost:4004"]
@@ -172,7 +172,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
                 for n in external_nodes:
                     try:
                         external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
-                        ext_file_list = external_stub.ListFiles(RequestFileList(isClient = False))
+                        ext_file_list = external_stub.ListFiles(RequestFileList(isClient = False), timeout=0.5)
                         print(ext_file_list.lstFileNames)
                         file_list.update(ext_file_list.lstFileNames)
                     except:
@@ -195,7 +195,7 @@ def findDataCenter():
     #     count += 1
     #     if count < 4:
     #         weighted_random.append(dc_size[0])
-    return choice(dc_sizes.keys())
+    return choice(list(dc_sizes.keys()))
     ##TODO if the file already exists, return the DC that consists the file
 
 def findProxies():
