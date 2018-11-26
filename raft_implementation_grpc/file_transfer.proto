@@ -10,6 +10,12 @@ message FileInfo {
 	string fileName = 1;		// teamname_fileid (unique)
 }
 
+message FileUploadInfo {
+	string fileName = 1;		// teamname_fileid (unique)
+	float fileSize = 2;
+	int64 maxChunks = 3;
+}
+
 message ChunkInfo {
 	string fileName = 1;
 	int64 chunkId = 2;			// Starts from 0 - N
@@ -26,10 +32,10 @@ message FileMetaData {
 
 message FileUploadData {
 	string fileName = 1;
-	bytes data = 2;
-	int64 seqNum = 3;
-	int64 seqMax = 4;
-	int64 chunkId = 5;
+	int64 chunkId =2;		// Required to upload file parallely
+	bytes data = 3;
+	int64 seqNum = 4;
+	int64 seqMax = 5;
 	int64 maxChunks = 6;
 }
 
@@ -49,6 +55,10 @@ message FileList {
 	repeated string lstFileNames = 1;
 }
 
+message ProxyList {
+	repeated ProxyInfo lstProxy = 1;
+}
+
 service DataTransferService {
 
 	// From team's client to team's own cluster
@@ -64,6 +74,11 @@ service DataTransferService {
 
 	// Interteam request
 	rpc ListFiles (RequestFileList) returns (FileList);
+	
+
+	// Request File upload get back proxy list to 
+	// return proxylist when raft consensus is reached
+	rpc RequestFileUpload(FileUploadInfo) returns (ProxyList);
 }
 
 
