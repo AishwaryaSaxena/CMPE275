@@ -3,6 +3,7 @@ proto/__pycache__/
 client/__pycache__/
 dc/__pycache__/
 raft/__pycache__/
-client/uploads
-client/downloads
+client/uploads/
+client/.cache/
+client/downloads/
 .vscode
