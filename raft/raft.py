@@ -1,3 +1,8 @@
+import sys
+import os
+from pathlib import Path
+sys.path.append(str(Path(os.path.dirname(os.path.abspath(__file__))).parent))
+sys.path.append(str(Path(os.path.dirname(os.path.abspath(__file__))).parent)+'/proto')
 import raft_pb2_grpc
 from raft_pb2 import Heartbeat, VoteReq, Vote, AckHB, Empty, Log, DcList, ReplicateFileInfo
 from random import uniform, choice 
@@ -5,7 +10,6 @@ from time import sleep
 import grpc
 from concurrent import futures
 from threading import Thread, Event
-import sys
 from enum import Enum
 from file_transfer_pb2 import FileLocationInfo, ProxyInfo, FileList, RequestFileList
 import file_transfer_pb2_grpc
@@ -16,21 +20,22 @@ class States(Enum):
     Leader = 3
 
 replication_factor = 3
-# my_id = "localhost:4000"
-my_id = "10.0.40.1:10000"
+my_id = "localhost:4000"
+# my_id = "10.0.40.1:10000"
 leader_id = ""
 my_vote = False
 my_term = 1
-my_state = States.Follower
+my_state = States.Leader
 delay = uniform(1.0, 1.5)
 stubs = []
-friends = ["10.0.40.2:10001", "10.0.40.2:10000", "10.0.40.3:10000", "10.0.40.4:10000"]
-external_nodes = ["10.0.10.1:10000", "10.0.10.2:10000", "10.0.10.3:10000", "10.0.10.2:10001", "10.0.10.3:10001", "10.0.30.1:10000", "10.0.30.2:10000", "10.0.30.3:10000", "10.0.30.4:10000"]
+# friends = ["10.0.40.2:10001", "10.0.40.2:10000", "10.0.40.3:10000", "10.0.40.4:10000"]
+external_nodes = ["10.0.10.1:10000", "10.0.10.2:10000", "10.0.10.3:10000", "10.0.10.2:10001", "10.0.10.3:10001", "10.0.30.1:10000", "10.0.30.2:10000", "10.0.30.3:10000", 
+"10.0.30.4:10000", "10.0.30.3:10001"]
 hb_recv = False
 # vr_recv = False
-# friends = ["localhost:4001", "localhost:4002", "localhost:4003", "localhost:4004"]
-# dcs = ["localhost:5000", "localhost:5001", "localhost:5002", "localhost:5003", "localhost:5004"]
-dcs = ["10.0.40.1:5000", "10.0.40.2:5000", "10.0.40.3:5000", "10.0.40.4:5000", "10.0.40.2:5001"]
+friends = ["localhost:4001", "localhost:4002", "localhost:4003", "localhost:4004"]
+dcs = ["localhost:5000", "localhost:5001", "localhost:5002", "localhost:5003", "localhost:5004"]
+# dcs = ["10.0.40.1:5000", "10.0.40.2:5000", "10.0.40.3:5000", "10.0.40.4:5000", "10.0.40.2:5001"]
 dc_files = {}
 file_max_chunks = {}
 file_log = {}
@@ -89,7 +94,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
         if my_state != States.Leader:
             try:
                 leader_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(leader_id))
-                return leader_stub.RequestFileInfo(FileInfo)
+                return leader_stub.RequestFileInfo(FileInfo, timeout=1)
             except:
                 return FileLocationInfo(fileName = fileName, maxChunks = 0, lstProxy = [], isFileFound = False)
         else:
@@ -113,7 +118,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
                 for n in external_nodes:
                     try:
                         external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
-                        file_loc_info = external_stub.GetFileLocation(FileInfo)
+                        file_loc_info = external_stub.GetFileLocation(FileInfo, timeout=0.2)
                         if file_loc_info.isFileFound:
                             return file_loc_info
                     except:
@@ -172,7 +177,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
                 for n in external_nodes:
                     try:
                         external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
-                        ext_file_list = external_stub.ListFiles(RequestFileList(isClient = False), timeout=0.5)
+                        ext_file_list = external_stub.ListFiles(RequestFileList(isClient = False), timeout=0.2)
                         print(ext_file_list.lstFileNames)
                         file_list.update(ext_file_list.lstFileNames)
                     except:
@@ -189,12 +194,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
 
 def findDataCenter():
     global dc_sizes
-    # count = 0
-    # weighted_random = []
-    # for dc_size in sorted(dc_sizes.items(), key=lambda x: x[1]):
-    #     count += 1
-    #     if count < 4:
-    #         weighted_random.append(dc_size[0])
+    print(dc_sizes)
     return choice(list(dc_sizes.keys()))
     ##TODO if the file already exists, return the DC that consists the file
 
@@ -286,13 +286,13 @@ def leaderActions():
                 d = {}
                 for file_key in file_log.keys(): 
                     d[file_key] = DcList(dcs=file_log[file_key])
-                hb_ack = stubs[i].SendHeartBeat(Heartbeat(id=my_id, currentTerm=my_term, log = Log(fileLog = d, maxChunks = file_max_chunks, dcSizes = dc_sizes)), timeout=0.1)
+                hb_ack = stubs[i].SendHeartBeat(Heartbeat(id=my_id, currentTerm=my_term, log = Log(fileLog = d, maxChunks = file_max_chunks, dcSizes = dc_sizes)), timeout=0.2)
                 if friends[i] not in live_nodes:
                     live_nodes.append(friends[i])
             except:
                 if friends[i] in live_nodes:
                     live_nodes.remove(friends[i])
-        sleep(0.5)
+        sleep(1)
 
 def checkDcHealth():
     global my_state, dcs, my_id, dc_files, file_max_chunks, file_log, dc_sizes
@@ -301,7 +301,7 @@ def checkDcHealth():
             for dc in dcs:
                 stub = raft_pb2_grpc.raftImplemetationStub(grpc.insecure_channel(dc))
                 try:
-                    hb_ack = stub.SendHeartBeat(Heartbeat(id=my_id), timeout=0.1)
+                    hb_ack = stub.SendHeartBeat(Heartbeat(id=my_id), timeout=0.2)
                     dc_sizes[dc] = hb_ack.sizeAvail
                     dc_ack = list(hb_ack.dcAck)
                     max_chunks = dict(hb_ack.maxChunks)

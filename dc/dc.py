@@ -1,6 +1,8 @@
-import sys, os
+import sys
+import os
+from pathlib import Path
+sys.path.append(str(Path(os.path.dirname(os.path.abspath(__file__))).parent)+'/proto')
 from os.path import isfile, join
-sys.path.append("/home/tejak/Documents/275/CMPE275/raft_implementation_grpc")
 import file_transfer_pb2
 import file_transfer_pb2_grpc
 import raft_pb2_grpc
@@ -9,10 +11,9 @@ from time import sleep
 import grpc
 from concurrent import futures
 from threading import Thread, Event
-from collections import deque
 
-# my_id = "localhost:5000"
-my_id = "10.0.40.1:5000"
+my_id = "localhost:5000"
+# my_id = "10.0.40.1:5000"
 dc_resp = []
 file_max_chunks = {}
 size_avail = 0
@@ -45,6 +46,7 @@ class DataCenter(file_transfer_pb2_grpc.DataTransferServiceServicer, raft_pb2_gr
         fileName = fud.fileName
         chunkId = str(fud.chunkId)
         maxChunks = fud.maxChunks
+        print("receiving file "+ fileName + " chunk-" + chunkId)
         if fileName not in file_max_chunks.keys():
             file_max_chunks[fileName] = maxChunks
         with open(fileName + "_" + chunkId, 'wb') as f:
@@ -91,7 +93,7 @@ def checkFiles():
     global dc_resp, size_avail
     while True:
         event.wait()
-        dc_resp = [f for f in os.listdir() if isfile(join(".",f)) and f != "dc.py"]
+        dc_resp = [f for f in os.listdir(".") if isfile(join(".",f)) and f != "dc.py"]
         size_avail = os.statvfs(dc_path).f_frsize * os.statvfs(dc_path).f_bavail
         print(dc_resp)
         sleep(3)
@@ -110,16 +112,12 @@ def serve():
     except KeyboardInterrupt:
         sys.exit(1)
 
-def client():
-    print("dc working")
 
 if __name__ == '__main__':
     event = Event()
     event.set()
     t1 = Thread(target=serve)
-    t2 = Thread(target=client)
     t3 = Thread(target=checkFiles)
     
     t1.start()
-    t2.start()
     t3.start()
