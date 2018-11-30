@@ -31,15 +31,16 @@ my_state = States.Leader
 delay = uniform(1.0, 1.5)
 stubs = []
 
-my_id = config['raft_my_id']
-friends = config['friends']
-dcs = config['dcs']
-external_nodes = config['external_nodes']
+# my_id = config['raft_my_id']
+# friends = config['friends']
+# dcs = config['dcs']
 
-# my_id = "localhost:4000"
-# friends = ["localhost:4001", "localhost:4002", "localhost:4003", "localhost:4004"]
-# dcs = ["localhost:5000", "localhost:5001", "localhost:5002", "localhost:5003", "localhost:5004"]
+my_id = "localhost:4000"
+friends = ["localhost:4001", "localhost:4002", "localhost:4003", "localhost:4004"]
+dcs = ["localhost:5000", "localhost:5001", "localhost:5002", "localhost:5003", "localhost:5004"]
 
+# external_nodes = config['external_nodes']
+external_nodes = []
 
 hb_recv = False
 dc_files = {}

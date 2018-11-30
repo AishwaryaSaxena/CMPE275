@@ -1,7 +1,6 @@
 import sys
 import os
 from pathlib import Path
-sys.path.append(str(Path(os.path.dirname(os.path.abspath(__file__))).parent))
 sys.path.append(str(Path(os.path.dirname(os.path.abspath(__file__))).parent)+'/proto')
 import grpc
 import file_transfer_pb2
@@ -10,7 +9,7 @@ import ntpath
 from time import sleep, time
 import pyinotify
 from threading import Thread
-from threadpool.threadpool import ThreadPool
+from threadpool import ThreadPool
 import shutil
 from math import ceil
 from random import choice
@@ -19,6 +18,11 @@ import json
 pool = ThreadPool(10)
 TMP_DIR = str(os.path.dirname(os.path.abspath(__file__))) + '/.cache/'
 WATCH_DIR = str(os.path.dirname(os.path.abspath(__file__))) + '/uploads'
+
+if not os.path.exists(TMP_DIR):
+    os.makedirs(TMP_DIR, exist_ok=True)
+if not os.path.exists(WATCH_DIR):
+    os.makedirs(WATCH_DIR, exist_ok=True)
 
 with open('../conf/config.json', 'r') as conf:
     config = json.load(conf)
@@ -30,8 +34,8 @@ raft_nodes = config['raft_nodes']
 class MyEventHandler(pyinotify.ProcessEvent):
     def process_IN_CLOSE_WRITE(self, event):
         global max_chunks, TMP_DIR, chunk_size 
-        print(event.pathname)
         max_chunks[path_leaf(event.pathname)] = ceil(os.path.getsize(event.pathname) / chunk_size)
+        print(max_chunks)
         part = split(event.pathname, TMP_DIR, chunk_size)
             
 class MyNewEventHandler(pyinotify.ProcessEvent):
@@ -77,7 +81,7 @@ def path_leaf(path):
     return tail or ntpath.basename(head)
 
 def callUpload(it):
-    stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel("10.0.40.1:10000"))
+    stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel("localhost:5000"))
     stub.UploadFile(it)
 
 def run():
