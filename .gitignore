@@ -8,3 +8,4 @@ client/.cache/
 client/downloads/
 conf/
 .vscode
+env
