@@ -6,4 +6,5 @@ raft/__pycache__/
 client/uploads/
 client/.cache/
 client/downloads/
+conf/
 .vscode

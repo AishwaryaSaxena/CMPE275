@@ -13,29 +13,35 @@ from threading import Thread, Event
 from enum import Enum
 from file_transfer_pb2 import FileLocationInfo, ProxyInfo, FileList, RequestFileList
 import file_transfer_pb2_grpc
+import json
+
+with open('../conf/config.json', 'r') as conf:
+    config = json.load(conf)
 
 class States(Enum):
     Follower = 1
     Candidate = 2
     Leader = 3
 
-replication_factor = 3
-my_id = "localhost:4000"
-# my_id = "10.0.40.1:10000"
+replication_factor = config['replication_factor']
 leader_id = ""
 my_vote = False
 my_term = 1
 my_state = States.Leader
 delay = uniform(1.0, 1.5)
 stubs = []
-# friends = ["10.0.40.2:10001", "10.0.40.2:10000", "10.0.40.3:10000", "10.0.40.4:10000"]
-external_nodes = ["10.0.10.1:10000", "10.0.10.2:10000", "10.0.10.3:10000", "10.0.10.2:10001", "10.0.10.3:10001", "10.0.30.1:10000", "10.0.30.2:10000", "10.0.30.3:10000", 
-"10.0.30.4:10000", "10.0.30.3:10001"]
+
+my_id = config['raft_my_id']
+friends = config['friends']
+dcs = config['dcs']
+external_nodes = config['external_nodes']
+
+# my_id = "localhost:4000"
+# friends = ["localhost:4001", "localhost:4002", "localhost:4003", "localhost:4004"]
+# dcs = ["localhost:5000", "localhost:5001", "localhost:5002", "localhost:5003", "localhost:5004"]
+
+
 hb_recv = False
-# vr_recv = False
-friends = ["localhost:4001", "localhost:4002", "localhost:4003", "localhost:4004"]
-dcs = ["localhost:5000", "localhost:5001", "localhost:5002", "localhost:5003", "localhost:5004"]
-# dcs = ["10.0.40.1:5000", "10.0.40.2:5000", "10.0.40.3:5000", "10.0.40.4:5000", "10.0.40.2:5001"]
 dc_files = {}
 file_max_chunks = {}
 file_log = {}

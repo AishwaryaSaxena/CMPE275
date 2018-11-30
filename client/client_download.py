@@ -11,11 +11,15 @@ from time import sleep, time
 import shutil
 from random import choice
 from threadpool.threadpool import ThreadPool
+import json
 
 pool = ThreadPool(10)
-# raft_nodes = ["10.0.40.2:10001", "10.0.40.2:10000", "10.0.40.3:10000", "10.0.40.4:10000","10.0.40.1:10000"]
-raft_nodes = ["10.0.40.3:10000", "10.0.40.4:10000", "10.0.40.1:10000"]
-cache_dir = "/home/tejak/Desktop/CMPE275/client/downloads/.cache/"
+
+with open('../conf/config.json', 'r') as conf:
+    config = json.load(conf)
+
+raft_nodes = config['raft_nodes']
+cache_dir = str(os.path.dirname(os.path.abspath(__file__))) + '/downloads/.cache/'
 
 def download():
     global pool

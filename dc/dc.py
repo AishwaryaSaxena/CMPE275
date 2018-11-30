@@ -11,13 +11,18 @@ from time import sleep
 import grpc
 from concurrent import futures
 from threading import Thread, Event
+import json 
 
-my_id = "localhost:5000"
-# my_id = "10.0.40.1:5000"
+with open('../conf/config.json', 'r') as conf:
+    config = json.load(conf)
+
+my_id = config['dc_my_id']
 dc_resp = []
 file_max_chunks = {}
 size_avail = 0
-dc_path = '/home/tejak/Documents'
+dc_path = '/'
+
+# my_id = "localhost:5000"
 
 class DataCenter(file_transfer_pb2_grpc.DataTransferServiceServicer, raft_pb2_grpc.raftImplemetationServicer):
     def RequestFileInfo(self, fileInfo, context):

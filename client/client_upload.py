@@ -6,8 +6,6 @@ sys.path.append(str(Path(os.path.dirname(os.path.abspath(__file__))).parent)+'/p
 import grpc
 import file_transfer_pb2
 import file_transfer_pb2_grpc
-import raft_pb2
-import raft_pb2_grpc
 import ntpath
 from time import sleep, time
 import pyinotify
@@ -16,22 +14,25 @@ from threadpool.threadpool import ThreadPool
 import shutil
 from math import ceil
 from random import choice
+import json
 
 pool = ThreadPool(10)
-tmp_dir = "/home/tejak/Desktop/CMPE275/client/.cache/"
-WATCH_DIR = '/home/tejak/Desktop/CMPE275/client/uploads'
+TMP_DIR = str(os.path.dirname(os.path.abspath(__file__))) + '/.cache/'
+WATCH_DIR = str(os.path.dirname(os.path.abspath(__file__))) + '/uploads'
+
+with open('../conf/config.json', 'r') as conf:
+    config = json.load(conf)
+
 max_chunks = {}
 chunk_size = 1024*1024*200
-# raft_nodes = ["10.0.40.2:10001", "10.0.40.2:10000", "10.0.40.3:10000", "10.0.40.4:10000","10.0.40.1:10000"]
-raft_nodes = ["10.0.40.3:10000", "10.0.40.4:10000", "10.0.40.1:10000"]
+raft_nodes = config['raft_nodes']
 
 class MyEventHandler(pyinotify.ProcessEvent):
     def process_IN_CLOSE_WRITE(self, event):
-        global max_chunks, tmp_dir, chunk_size 
+        global max_chunks, TMP_DIR, chunk_size 
         print(event.pathname)
         max_chunks[path_leaf(event.pathname)] = ceil(os.path.getsize(event.pathname) / chunk_size)
-        # print(max_chunks)
-        part = split(event.pathname, tmp_dir, chunk_size)
+        part = split(event.pathname, TMP_DIR, chunk_size)
             
 class MyNewEventHandler(pyinotify.ProcessEvent):
     def process_IN_CLOSE_WRITE(self, event):
@@ -92,7 +93,7 @@ def run():
 
 def run1():
     wm = pyinotify.WatchManager()
-    wm.add_watch(tmp_dir, pyinotify.IN_CLOSE_WRITE, rec=True)
+    wm.add_watch(TMP_DIR, pyinotify.IN_CLOSE_WRITE, rec=True)
 
     # event handler
     eh = MyNewEventHandler()
@@ -106,8 +107,3 @@ def run1():
 if __name__ == '__main__':
     Thread(target=run).start()
     Thread(target=run1).start()
-
-
-
-
-
