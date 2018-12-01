@@ -10,7 +10,7 @@ from os.path import isfile, join
 from time import sleep, time
 import shutil
 from random import choice
-from threadpool.threadpool import ThreadPool
+from threadpool import ThreadPool
 import json
 
 pool = ThreadPool(10)

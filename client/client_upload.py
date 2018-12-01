@@ -81,7 +81,7 @@ def path_leaf(path):
     return tail or ntpath.basename(head)
 
 def callUpload(it):
-    stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel("localhost:5000"))
+    stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel("10.0.40.1:10000"))
     stub.UploadFile(it)
 
 def run():
