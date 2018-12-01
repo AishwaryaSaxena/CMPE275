@@ -1,4 +1,4 @@
-grpcio
-grpcio-tools
+grpcio==1.16.1
+grpcio-tools==1.16.1
 protobuf==3.5.1
 pathlib
