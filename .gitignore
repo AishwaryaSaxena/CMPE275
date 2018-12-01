@@ -1,7 +1,8 @@
 __pycache__/
 proto/__pycache__/
 client/__pycache__/
-dc/__pycache__/
+dc/*
+!dc/dc.py
 raft/__pycache__/
 client/uploads/
 client/.cache/
