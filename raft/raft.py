@@ -292,7 +292,7 @@ def leaderActions():
                 d = {}
                 for file_key in file_log.keys(): 
                     d[file_key] = DcList(dcs=file_log[file_key])
-                hb_ack = stubs[i].SendHeartBeat(Heartbeat(id=my_id, currentTerm=my_term, log = Log(fileLog = d, maxChunks = file_max_chunks, dcSizes = dc_sizes)), timeout=0.2)
+                hb_ack = stubs[i].SendHeartBeat(Heartbeat(id=my_id, currentTerm=my_term, log = Log(fileLog = d, maxChunks = file_max_chunks, dcSizes = dc_sizes)), timeout=0.1)
                 if friends[i] not in live_nodes:
                     live_nodes.append(friends[i])
             except:
