@@ -40,6 +40,7 @@ dcs = config['dcs']
 # dcs = ["localhost:5000", "localhost:5001", "localhost:5002", "localhost:5003", "localhost:5004"]
 
 external_nodes = config['external_nodes']
+live_external_nodes = external_nodes
 
 hb_recv = False
 dc_files = {}
@@ -186,7 +187,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
             if isClient:
                 if not stress_event.isSet():
                     external_stub = ""
-                    for n in external_nodes:
+                    for n in live_external_nodes:
                         try:
                             external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
                             ext_file_list = external_stub.ListFiles(RequestFileList(isClient = False), timeout=0.1)
@@ -219,7 +220,7 @@ def cacheHandler():
             for f_c in file_log.keys():
                 if len(file_log[f_c]) != 0:
                     file_list.add(f_c.rsplit('_', 1)[0])
-            for n in external_nodes:
+            for n in live_external_nodes:
                 try:
                     external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
                     ext_file_list = external_stub.ListFiles(RequestFileList(isClient = False), timeout=0.1)
@@ -242,6 +243,7 @@ def findProxies():
     return live_nodes
 
 def serve():
+    global live_external_nodes
     raft = RaftImpl()
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     raft_pb2_grpc.add_raftImplemetationServicer_to_server(raft, server)
@@ -250,7 +252,17 @@ def serve():
     server.start()
     try: 
         while True:
-            sleep(86400)
+            if my_state == States.Leader:
+                for node in external_nodes:
+                    try:
+                        external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(node))
+                        ext_file_list = external_stub.ListFiles(RequestFileList(isClient = False), timeout=0.1)
+                        if node not in live_external_nodes:
+                            live_external_nodes.append(node)
+                    except:
+                        if node in live_external_nodes:
+                            live_external_nodes.remove(node)
+            sleep(3)
     except KeyboardInterrupt:
         sys.exit(1)
 
