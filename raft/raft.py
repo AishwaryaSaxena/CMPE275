@@ -227,8 +227,8 @@ def cacheHandler():
                 except:
                     pass
             cached_list_files = list(file_list)
-            list_files_timer -= 1
-            sleep(1)
+            list_files_timer -= 2
+            sleep(2)
         if stress_event.isSet():
             stress_event.clear()
 
