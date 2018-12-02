@@ -210,7 +210,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
         pass
 
 def cacheHandler():
-    global list_files_timer
+    global list_files_timer, cached_list_files
     while True:
         while(list_files_timer > 0):
             stress_event.wait()
