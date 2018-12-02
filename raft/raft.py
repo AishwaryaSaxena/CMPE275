@@ -40,7 +40,7 @@ dcs = config['dcs']
 # dcs = ["localhost:5000", "localhost:5001", "localhost:5002", "localhost:5003", "localhost:5004"]
 
 external_nodes = config['external_nodes']
-live_external_nodes = external_nodes
+live_external_nodes = config['live_external_nodes']
 
 hb_recv = False
 dc_files = {}
@@ -103,7 +103,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
         return AckHB(ack="StillAlive")
     
     def RequestFileInfo(self, fileInfo, context):
-        global file_info_timer, cached_file_info, external_nodes
+        global file_info_timer, cached_file_info
         fileName = fileInfo.fileName
         if my_state != States.Leader:
             try:
