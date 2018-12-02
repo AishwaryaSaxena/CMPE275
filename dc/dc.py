@@ -73,6 +73,7 @@ class DataCenter(file_transfer_pb2_grpc.DataTransferServiceServicer, raft_pb2_gr
 
     def SendHeartBeat(self, hearBeat, context):
         global size_avail
+        print("Sending heartbeats: ")
         return AckHB(dcAck = dc_resp, maxChunks = file_max_chunks, sizeAvail = size_avail)
 
     def ReplicateFile(self, replicateFileInfo, context):
