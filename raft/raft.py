@@ -81,18 +81,19 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
     
     def SendHeartBeat(self, hearBeat, context):
         global hb_recv, my_state, my_term, file_log, file_max_chunks, leader_id, my_vote, dc_sizes
-        hb_recv = True
-        # vr_recv = False
-        my_vote = True
-        my_state = States.Follower
-        my_term = hearBeat.currentTerm
-        leader_id = hearBeat.id
-        file_log = dict(hearBeat.log.fileLog)
-        for file_key in file_log.keys(): 
-            file_log[file_key] = list(file_log[file_key].dcs)
-        file_max_chunks = dict(hearBeat.log.maxChunks)
-        # print("HeartBeat received")
-        dc_sizes = dict(hearBeat.log.dcSizes)
+        if my_term <= hearBeat.currentTerm:
+            hb_recv = True
+            # vr_recv = False
+            my_vote = True
+            my_state = States.Follower
+            my_term = hearBeat.currentTerm
+            leader_id = hearBeat.id
+            file_log = dict(hearBeat.log.fileLog)
+            for file_key in file_log.keys(): 
+                file_log[file_key] = list(file_log[file_key].dcs)
+            file_max_chunks = dict(hearBeat.log.maxChunks)
+            # print("HeartBeat received")
+            dc_sizes = dict(hearBeat.log.dcSizes)
         return AckHB(ack="StillAlive")
     
     def RequestFileInfo(self, FileInfo, context):
