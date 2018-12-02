@@ -130,7 +130,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
             else:
                 if not file_info_cache_event.isSet():
                     external_stub = ""
-                    for n in external_nodes:
+                    for n in live_external_nodes:
                         try:
                             external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
                             file_loc_info = external_stub.GetFileLocation(fileInfo, timeout=0.1)
@@ -148,7 +148,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
                 else:
                     if fileName not in cached_file_info.keys():
                         external_stub = ""
-                        for n in external_nodes:
+                        for n in live_external_nodes:
                             try:
                                 external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
                                 file_loc_info = external_stub.GetFileLocation(fileInfo, timeout=0.1)
@@ -275,7 +275,7 @@ def fileInfoCacheHandler():
                     del cached_file_info[fileName]
                     continue
                 file_loc_info = FileLocationInfo(fileName = fileName, maxChunks = 0, lstProxy = [], isFileFound = False)
-                for n in external_nodes:
+                for n in live_external_nodes:
                     try:
                         external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
                         file_loc_info = external_stub.GetFileLocation(FileInfo(fileName=fileName), timeout=0.1)
