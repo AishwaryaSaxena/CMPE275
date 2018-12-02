@@ -195,6 +195,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
                         except:
                             pass
                     cached_list_files = list(file_list)
+                    list_files_timer = 10
                     stress_event.set()
                     return FileList(lstFileNames = list(file_list))
                 else:
@@ -212,8 +213,8 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
 def cacheHandler():
     global list_files_timer, cached_list_files
     while True:
+        stress_event.wait()
         while(list_files_timer > 0):
-            stress_event.wait()
             file_list = set()
             for f_c in file_log.keys():
                 if len(file_log[f_c]) != 0:
@@ -227,10 +228,9 @@ def cacheHandler():
                 except:
                     pass
             cached_list_files = list(file_list)
-            list_files_timer -= 2
-            sleep(2)
-        if stress_event.isSet():
-            stress_event.clear()
+            list_files_timer -= 1
+            sleep(1)
+        stress_event.clear()
 
 def findDataCenter():
     global dc_sizes
