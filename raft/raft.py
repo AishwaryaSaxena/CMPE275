@@ -124,7 +124,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
                 for n in external_nodes:
                     try:
                         external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
-                        file_loc_info = external_stub.GetFileLocation(FileInfo, timeout=0.2)
+                        file_loc_info = external_stub.GetFileLocation(FileInfo, timeout=0.1)
                         if file_loc_info.isFileFound:
                             return file_loc_info
                     except:
@@ -183,7 +183,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
                 for n in external_nodes:
                     try:
                         external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
-                        ext_file_list = external_stub.ListFiles(RequestFileList(isClient = False), timeout=0.2)
+                        ext_file_list = external_stub.ListFiles(RequestFileList(isClient = False), timeout=0.1)
                         print(ext_file_list.lstFileNames)
                         file_list.update(ext_file_list.lstFileNames)
                     except:
