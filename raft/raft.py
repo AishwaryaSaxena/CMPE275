@@ -48,6 +48,9 @@ file_log = {}
 dc_sizes = {}
 live_nodes = []
 
+cached_list_files = []
+list_files_timer = 10
+
 class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.DataTransferServiceServicer):
     def RequestVote(self, voteReq, context):
         global my_state, my_term, hb_recv, my_vote
@@ -164,6 +167,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
         return dc_stub.UploadFile(FileUploadData_stream)
 
     def ListFiles(self, requestFileList, context):
+        global cached_list_files, list_files_timer
         isClient = requestFileList.isClient
         if my_state != States.Leader:
             if isClient:
@@ -180,16 +184,22 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
                 if len(file_log[f_c]) != 0:
                     file_list.add(f_c.rsplit('_', 1)[0])
             if isClient:
-                external_stub = ""
-                for n in external_nodes:
-                    try:
-                        external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
-                        ext_file_list = external_stub.ListFiles(RequestFileList(isClient = False), timeout=0.1)
-                        print(ext_file_list.lstFileNames)
-                        file_list.update(ext_file_list.lstFileNames)
-                    except:
-                        pass
-                return FileList(lstFileNames = list(file_list))
+                if not stress_event.isSet():
+                    external_stub = ""
+                    for n in external_nodes:
+                        try:
+                            external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
+                            ext_file_list = external_stub.ListFiles(RequestFileList(isClient = False), timeout=0.1)
+                            print(ext_file_list.lstFileNames)
+                            file_list.update(ext_file_list.lstFileNames)
+                        except:
+                            pass
+                    cached_list_files = list(file_list)
+                    stress_event.set()
+                    return FileList(lstFileNames = list(file_list))
+                else:
+                    list_files_timer = 10
+                    return FileList(lstFileNames = cached_list_files)
             else:
                 return FileList(lstFileNames = list(file_list))
 
@@ -198,6 +208,29 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
     
     def DeleteFile(self, replicateFileInfo, context):
         pass
+
+def cacheHandler():
+    global list_files_timer
+    while True:
+        while(list_files_timer > 0):
+            stress_event.wait()
+            file_list = set()
+            for f_c in file_log.keys():
+                if len(file_log[f_c]) != 0:
+                    file_list.add(f_c.rsplit('_', 1)[0])
+            for n in external_nodes:
+                try:
+                    external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
+                    ext_file_list = external_stub.ListFiles(RequestFileList(isClient = False), timeout=0.1)
+                    print(ext_file_list.lstFileNames)
+                    file_list.update(ext_file_list.lstFileNames)
+                except:
+                    pass
+            cached_list_files = list(file_list)
+            list_files_timer -= 1
+            sleep(1)
+        if stress_event.isSet():
+            stress_event.clear()
 
 def findDataCenter():
     global dc_sizes
@@ -370,13 +403,16 @@ def replicationHandler():
 
 
 if __name__ == '__main__':
+    stress_event = Event()
     t1 = Thread(target=serve)
     t2 = Thread(target=client)
     t3 = Thread(target=checkDcHealth)
     t4 = Thread(target=replicationHandler)
+    t5 = Thread(target=cacheHandler)
     
     t1.start()
     t2.start()
     t3.start()
     t4.start()
+    t5.start()
     
