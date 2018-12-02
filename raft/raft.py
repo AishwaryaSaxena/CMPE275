@@ -103,7 +103,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
         return AckHB(ack="StillAlive")
     
     def RequestFileInfo(self, fileInfo, context):
-        global file_info_timer, cached_file_info
+        global file_info_timer, cached_file_info, external_nodes
         fileName = fileInfo.fileName
         if my_state != States.Leader:
             try:
@@ -268,12 +268,13 @@ def fileInfoCacheHandler():
     global file_info_timer, cached_file_info
     while True:
         file_info_cache_event.wait()
-        while(len(file_info_timer.keys) > 0):
+        while(len(file_info_timer.keys()) > 0):
             for fileName in list(file_info_timer.keys()):
                 if file_info_timer[fileName] == 0:
                     del file_info_timer[fileName]
                     del cached_file_info[fileName]
                     continue
+                file_loc_info = FileLocationInfo(fileName = fileName, maxChunks = 0, lstProxy = [], isFileFound = False)
                 for n in external_nodes:
                     try:
                         external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
@@ -288,6 +289,7 @@ def fileInfoCacheHandler():
                 else:
                     cached_file_info[fileName] = FileLocationInfo(fileName = fileName, maxChunks = 0, lstProxy = [], isFileFound = False)
                     file_info_timer[fileName] -= 1
+            sleep(1)
         file_info_cache_event.clear()
                 
 
