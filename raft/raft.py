@@ -11,7 +11,7 @@ import grpc
 from concurrent import futures
 from threading import Thread, Event
 from enum import Enum
-from file_transfer_pb2 import FileLocationInfo, ProxyInfo, FileList, RequestFileList
+from file_transfer_pb2 import FileLocationInfo, ProxyInfo, FileList, RequestFileList, FileInfo
 import file_transfer_pb2_grpc
 import json
 
@@ -51,6 +51,8 @@ live_nodes = []
 
 cached_list_files = []
 list_files_timer = 10
+cached_file_info = {}
+file_info_timer = {}
 
 class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.DataTransferServiceServicer):
     def RequestVote(self, voteReq, context):
@@ -100,12 +102,13 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
             dc_sizes = dict(hearBeat.log.dcSizes)
         return AckHB(ack="StillAlive")
     
-    def RequestFileInfo(self, FileInfo, context):
-        fileName = FileInfo.fileName
+    def RequestFileInfo(self, fileInfo, context):
+        global file_info_timer, cached_file_info
+        fileName = fileInfo.fileName
         if my_state != States.Leader:
             try:
                 leader_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(leader_id))
-                return leader_stub.RequestFileInfo(FileInfo, timeout=1)
+                return leader_stub.RequestFileInfo(fileInfo, timeout=1)
             except:
                 return FileLocationInfo(fileName = fileName, maxChunks = 0, lstProxy = [], isFileFound = False)
         else:
@@ -123,18 +126,46 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
                 try:
                     return FileLocationInfo(fileName = fileName, maxChunks = file_max_chunks[fileName], lstProxy = proxies_ser, isFileFound = True)
                 except:
-                    return FileLocationInfo(fileName = fileName, maxChunks = 1, lstProxy = proxies_ser, isFileFound = True)
+                    return FileLocationInfo(fileName = fileName, maxChunks = 0, lstProxy = [], isFileFound = False)
             else:
-                external_stub = ""
-                for n in external_nodes:
-                    try:
-                        external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
-                        file_loc_info = external_stub.GetFileLocation(FileInfo, timeout=0.1)
-                        if file_loc_info.isFileFound:
-                            return file_loc_info
-                    except:
-                        pass
-                return FileLocationInfo(fileName = fileName, maxChunks = 0, lstProxy = [], isFileFound = False)
+                if not file_info_cache_event.isSet():
+                    external_stub = ""
+                    for n in external_nodes:
+                        try:
+                            external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
+                            file_loc_info = external_stub.GetFileLocation(fileInfo, timeout=0.1)
+                            if file_loc_info.isFileFound:
+                                cached_file_info[fileName] = file_loc_info
+                                file_info_timer[fileName] = 10
+                                file_info_cache_event.set()
+                                return file_loc_info
+                        except:
+                            pass
+                    cached_file_info[fileName] = FileLocationInfo(fileName = fileName, maxChunks = 0, lstProxy = [], isFileFound = False)
+                    file_info_timer[fileName] = 10
+                    file_info_cache_event.set()
+                    return FileLocationInfo(fileName = fileName, maxChunks = 0, lstProxy = [], isFileFound = False)
+                else:
+                    if fileName not in cached_file_info.keys():
+                        external_stub = ""
+                        for n in external_nodes:
+                            try:
+                                external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
+                                file_loc_info = external_stub.GetFileLocation(fileInfo, timeout=0.1)
+                                if file_loc_info.isFileFound:
+                                    cached_file_info[fileName] = file_loc_info
+                                    file_info_timer[fileName] = 10
+                                    file_info_cache_event.set()
+                                    return file_loc_info
+                            except:
+                                pass
+                        cached_file_info[fileName] = FileLocationInfo(fileName = fileName, maxChunks = 0, lstProxy = [], isFileFound = False)
+                        file_info_timer[fileName] = 10
+                        file_info_cache_event.set()
+                        return FileLocationInfo(fileName = fileName, maxChunks = 0, lstProxy = [], isFileFound = False)
+                    else:
+                        file_info_timer[fileName] = 10
+                        return cached_file_info[fileName]
     
     def GetFileLocation(self, FileInfo, context):
         fileName = FileInfo.fileName
@@ -185,7 +216,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
                 if len(file_log[f_c]) != 0:
                     file_list.add(f_c.rsplit('_', 1)[0])
             if isClient:
-                if not stress_event.isSet():
+                if not file_list_cache_event.isSet():
                     external_stub = ""
                     for n in live_external_nodes:
                         try:
@@ -197,7 +228,7 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
                             pass
                     cached_list_files = list(file_list)
                     list_files_timer = 10
-                    stress_event.set()
+                    file_list_cache_event.set()
                     return FileList(lstFileNames = list(file_list))
                 else:
                     list_files_timer = 10
@@ -211,10 +242,10 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
     def DeleteFile(self, replicateFileInfo, context):
         pass
 
-def cacheHandler():
+def fileListCacheHandler():
     global list_files_timer, cached_list_files
     while True:
-        stress_event.wait()
+        file_list_cache_event.wait()
         while(list_files_timer > 0):
             file_list = set()
             for f_c in file_log.keys():
@@ -231,7 +262,34 @@ def cacheHandler():
             cached_list_files = list(file_list)
             list_files_timer -= 1
             sleep(1)
-        stress_event.clear()
+        file_list_cache_event.clear()
+
+def fileInfoCacheHandler():
+    global file_info_timer, cached_file_info
+    while True:
+        file_info_cache_event.wait()
+        while(len(file_info_timer.keys) > 0):
+            for fileName in list(file_info_timer.keys()):
+                if file_info_timer[fileName] == 0:
+                    del file_info_timer[fileName]
+                    del cached_file_info[fileName]
+                    continue
+                for n in external_nodes:
+                    try:
+                        external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
+                        file_loc_info = external_stub.GetFileLocation(FileInfo(fileName=fileName), timeout=0.1)
+                        if file_loc_info.isFileFound:
+                            break
+                    except:
+                        pass
+                if file_loc_info.isFileFound:
+                    cached_file_info[fileName] = file_loc_info
+                    file_info_timer[fileName] -= 1
+                else:
+                    cached_file_info[fileName] = FileLocationInfo(fileName = fileName, maxChunks = 0, lstProxy = [], isFileFound = False)
+                    file_info_timer[fileName] -= 1
+        file_info_cache_event.clear()
+                
 
 def findDataCenter():
     global dc_sizes
@@ -251,6 +309,7 @@ def serve():
     server.add_insecure_port(my_id)
     server.start()
     try: 
+        # Utilizing thread to check live external nodes
         while True:
             if my_state == States.Leader:
                 for node in external_nodes:
@@ -415,16 +474,19 @@ def replicationHandler():
 
 
 if __name__ == '__main__':
-    stress_event = Event()
+    file_list_cache_event = Event()
+    file_info_cache_event = Event()
     t1 = Thread(target=serve)
     t2 = Thread(target=client)
     t3 = Thread(target=checkDcHealth)
     t4 = Thread(target=replicationHandler)
-    t5 = Thread(target=cacheHandler)
+    t5 = Thread(target=fileListCacheHandler)
+    t6 = Thread(target=fileInfoCacheHandler)
     
     t1.start()
     t2.start()
     t3.start()
     t4.start()
     t5.start()
+    t6.start()
     
