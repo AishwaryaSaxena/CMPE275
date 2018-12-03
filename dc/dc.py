@@ -42,6 +42,7 @@ class DataCenter(file_transfer_pb2_grpc.DataTransferServiceServicer, raft_pb2_gr
                 seq_list.append(chunk)
                 seq_num += 1
         for i in range(start_seq_num, len(seq_list)):
+            print("Sending " + file_name + ", ChunkId: " + chunk_id + ", SequenceNumber: " + i)
             yield file_transfer_pb2.FileMetaData(fileName=file_name, chunkId=chunk_id, data=seq_list[i], seqNum=i, seqMax=seq_num)
 
     def UploadFile(self, FileUploadData_stream, context):

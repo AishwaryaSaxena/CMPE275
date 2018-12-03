@@ -255,7 +255,6 @@ def fileListCacheHandler():
                 try:
                     external_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(n))
                     ext_file_list = external_stub.ListFiles(RequestFileList(isClient = False), timeout=0.1)
-                    print(ext_file_list.lstFileNames)
                     file_list.update(ext_file_list.lstFileNames)
                 except:
                     pass
