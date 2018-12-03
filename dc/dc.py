@@ -82,9 +82,21 @@ class DataCenter(file_transfer_pb2_grpc.DataTransferServiceServicer, raft_pb2_gr
         try:
             replication_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(replicateFileInfo.dcAddr))
             resps = replication_stub.DownloadChunk(file_transfer_pb2.ChunkInfo(fileName=file_name, chunkId=int(chunk_id)))
-            with open(replicateFileInfo.fileChunk, "wb") as f:
-                for resp in resps:
-                    f.write(resp.data)
+            # with open(replicateFileInfo.fileChunk, "wb") as f:
+            #     for resp in resps:
+            #         f.write(resp.data)
+            seq_list = []
+            for resp in resps:
+                seq_list.append(resp)
+            
+            seq_max = seq_list[0].seqMax
+
+            if len(seq_list) == seq_max:
+                with open(replicateFileInfo.fileChunk, "wb") as f:
+                    for seq in seq_list:
+                        f.write(seq.data)
+            else:
+                print("Replication Failed......")
         except:
             pass
         return Empty()
