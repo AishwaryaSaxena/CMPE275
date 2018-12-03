@@ -86,15 +86,16 @@ class DataCenter(file_transfer_pb2_grpc.DataTransferServiceServicer, raft_pb2_gr
             #     for resp in resps:
             #         f.write(resp.data)
             seq_list = []
-            for resp in resps:
-                seq_list.append(resp)
+            seq_max = 0
             
-            seq_max = seq_list[0].seqMax
+            for resp in resps:
+                seq_max = resp.seqMax
+                seq_list.append(resp.data)
 
             if len(seq_list) == seq_max:
                 with open(replicateFileInfo.fileChunk, "wb") as f:
                     for seq in seq_list:
-                        f.write(seq.data)
+                        f.write(seq)
             else:
                 print("Replication Failed......")
         except:
