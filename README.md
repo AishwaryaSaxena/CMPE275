@@ -7,7 +7,7 @@ python3 -m virtualenv env
 source env/bin/activate
 ```
 
-install requirements
+Install requirements
 
 ```sh
 pip3 install -r requirements.txt
@@ -16,7 +16,7 @@ pip3 install -r requirements.txt
 Edit the config.json file to match your cluster's IP addresses 
 
 ### Generate python files
-Run both the proto files to generate python files for serializing messages and grpc communication
+Navigate to the proto directory and run both the proto files to generate python files for serializing messages and grpc communication
 
 __raft.proto__
 
