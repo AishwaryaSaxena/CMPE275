@@ -35,10 +35,6 @@ my_id = config['raft_my_id']
 friends = config['friends']
 dcs = config['dcs']
 
-# my_id = "localhost:4000"
-# friends = ["localhost:4001", "localhost:4002", "localhost:4003", "localhost:4004"]
-# dcs = ["localhost:5000", "localhost:5001", "localhost:5002", "localhost:5003", "localhost:5004"]
-
 external_nodes = config['external_nodes']
 live_external_nodes = config['live_external_nodes']
 
@@ -193,7 +189,6 @@ class RaftImpl(raft_pb2_grpc.raftImplemetationServicer, file_transfer_pb2_grpc.D
         return dc_stub.DownloadChunk(chunkInfo)
 
     def UploadFile(self, FileUploadData_stream, context):
-        #TODO overwrite existing file
         dc = findDataCenter()
         dc_stub = file_transfer_pb2_grpc.DataTransferServiceStub(grpc.insecure_channel(dc))
         return dc_stub.UploadFile(FileUploadData_stream)
@@ -296,7 +291,6 @@ def findDataCenter():
     global dc_sizes
     print(dc_sizes)
     return choice(list(dc_sizes.keys()))
-    ##TODO if the file already exists, return the DC that consists the file
 
 def findProxies():
     return live_nodes
@@ -431,7 +425,6 @@ def checkDcHealth():
                             else:
                                 if dc in file_log[f_c]:
                                     file_log[f_c].remove(dc)
-                    # TODO remove live_dcs and add live_nodes
                     #print(dc_files, "\n", file_max_chunks, "\n", file_log)
                 except:
                     for f_c in list(file_log.keys()):
